@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { extractDocumentData } from '@/lib/openai';
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('document') as File;
     const profileId = formData.get('profileId') as string;
+    const openaiKey = req.headers.get('x-openai-key');
 
     if (!file) {
       return NextResponse.json({ error: 'No document provided' }, { status: 400 });
@@ -29,30 +31,23 @@ export async function POST(req: NextRequest) {
       .webp({ quality: 68 })
       .toBuffer();
 
-    // For now, return mock structured data based on profile
-    // In Day 4, we will hook this up to OpenAI gpt-4o-mini
-    let mockData = {};
-    if (profileId === 'ngo-receipt') {
-      mockData = {
-        date: '24-Oct-2023',
-        donorName: 'Rahul Sharma',
-        amount: '5000',
-        panNumber: 'ABCDE1234F',
-      };
-    } else {
-      mockData = {
-        date: '24-Oct-2023',
-        vehicleNumber: 'MH-12-AB-1234',
-        grossWeight: '15000',
-        tareWeight: '5000',
-      };
+    // Pass the OCR buffer to OpenAI for extraction
+    if (!openaiKey) {
+      return NextResponse.json({
+        success: true,
+        data: { date: '12-Aug-2023', vehicleNumber: 'MOCK-DATA', grossWeight: 5000, tareWeight: 1000 },
+        warning: 'No OpenAI key provided. Using mock data.',
+        _metadata: { processedAt: new Date().toISOString() }
+      });
     }
 
-    // Return the processed mock data to the client
+    const extractedData = await extractDocumentData(ocrBuffer, profileId, openaiKey);
+
+    // Return the processed data to the client
     return NextResponse.json({ 
       success: true, 
-      data: mockData,
-      message: 'Processed successfully (Mock)',
+      data: extractedData,
+      message: 'Processed successfully',
       stats: {
         originalSize: buffer.length,
         ocrSize: ocrBuffer.length,
@@ -60,8 +55,9 @@ export async function POST(req: NextRequest) {
       }
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error processing document:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process document' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process document';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.5.7",
     "@notionhq/client": "^5.23.2",
     "@tanstack/react-query": "^5.101.4",
     "@upstash/redis": "^1.38.0",
@@ -18,8 +19,11 @@
     "next-auth": "^4.24.15",
     "next-pwa": "^5.6.0",
     "notion-multipart-uploader": "^2.3.0",
+    "openai": "^6.49.0",
     "react": "^18",
     "react-dom": "^18",
+    "react-hook-form": "^7.83.0",
+    "react-hot-toast": "^2.6.0",
     "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
