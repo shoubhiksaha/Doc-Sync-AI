@@ -1,22 +1,29 @@
 import { google } from 'googleapis';
+import { NgoReceiptData, FactoryWeightSlipData } from './schemas';
 
-export async function syncToGoogleSheets(data: Record<string, unknown>, profileId: string) {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-    console.warn("Google credentials not set. Bypassing Google Sheets sync.");
+export async function syncToGoogleSheets(
+  data: NgoReceiptData | FactoryWeightSlipData, 
+  profileId: string, 
+  accessToken?: string,
+  spreadsheetId?: string | null
+) {
+  if (!accessToken) {
+    console.warn("No Google access token provided. Bypassing Google Sheets sync.");
+    return { success: true, mock: true };
+  }
+
+  // The spreadsheetId will come from the user's settings, but for hackathon demo we can still allow an env fallback 
+  // or pass it explicitly. Let's use a hardcoded or env var one if not provided, but auth is strictly USER OAuth.
+  const targetSheetId = spreadsheetId || process.env.GOOGLE_SHEET_ID;
+
+  if (!targetSheetId) {
+    console.warn("Missing GOOGLE_SHEET_ID. Bypassing Sheets sync.");
     return { success: true, mock: true };
   }
 
   try {
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    if (!spreadsheetId) throw new Error("Missing GOOGLE_SHEET_ID");
-
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
 
     const sheets = google.sheets({ version: 'v4', auth });
 
@@ -25,27 +32,31 @@ export async function syncToGoogleSheets(data: Record<string, unknown>, profileI
     let range = '';
 
     if (profileId === 'ngo-receipt') {
+      const ngoData = data as NgoReceiptData;
       range = 'NGO_Receipts!A:E';
       values = [[
-        data.date,
-        data.donorName,
-        data.amount,
-        data.panNumber || '',
+        ngoData.date,
+        ngoData.donorName,
+        ngoData.amount,
+        ngoData.panNumber || '',
         new Date().toISOString()
       ]];
     } else if (profileId === 'factory-weight-slip') {
+      const factoryData = data as FactoryWeightSlipData;
       range = 'Factory_Slips!A:E';
       values = [[
-        data.date,
-        data.vehicleNumber,
-        data.grossWeight,
-        data.tareWeight,
+        factoryData.date,
+        factoryData.vehicleNumber,
+        factoryData.grossWeight,
+        factoryData.tareWeight,
         new Date().toISOString()
       ]];
+    } else {
+      throw new Error('Unsupported profile ID');
     }
 
     await sheets.spreadsheets.values.append({
-      spreadsheetId,
+      spreadsheetId: targetSheetId,
       range,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },

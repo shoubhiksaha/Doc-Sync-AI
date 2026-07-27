@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncToNotion } from '@/lib/notion';
 import { syncToGoogleSheets } from '@/lib/sheets';
+import { getDecryptedCookie } from '@/lib/crypto';
+
+import { getToken } from 'next-auth/jwt';
 
 export async function POST(req: NextRequest) {
   try {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'mock_secret' });
+    const accessToken = token?.accessToken as string | undefined;
+
     const body = await req.json();
     const { data, profileId } = body;
 
@@ -13,13 +19,13 @@ export async function POST(req: NextRequest) {
 
     console.log(`Syncing data for ${profileId}...`);
 
-    const notionKey = req.headers.get('x-notion-key');
-    const notionDbId = req.headers.get('x-notion-db-id');
+    const notionKey = getDecryptedCookie(req, 'docsync_notion') || req.headers.get('x-notion-key');
+    const notionDbId = getDecryptedCookie(req, 'docsync_notion_db') || req.headers.get('x-notion-db-id');
 
     // Run both sync operations concurrently
     const [notionResult, sheetsResult] = await Promise.allSettled([
       syncToNotion(data, profileId, notionKey, notionDbId),
-      syncToGoogleSheets(data, profileId)
+      syncToGoogleSheets(data, profileId, accessToken)
     ]);
 
     const errors = [];
@@ -35,7 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: 'Successfully synced to all destinations' });
   } catch (error: unknown) {
     console.error('API Sync Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to sync data';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'An internal error occurred during data sync' }, { status: 500 });
   }
 }

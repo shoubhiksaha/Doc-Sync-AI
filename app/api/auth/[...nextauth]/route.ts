@@ -17,6 +17,7 @@ const handler = NextAuth({
       }
     }),
   ],
+  secret: process.env.NEXTAUTH_SECRET || 'fallback_secret_for_development',
   pages: {
     signIn: '/login',
   },

@@ -7,18 +7,38 @@ export default function SettingsPage() {
   const [notionKey, setNotionKey] = useState('');
   const [notionDbId, setNotionDbId] = useState('');
 
-  // Load from local storage on mount
+  // Load from API on mount
   useEffect(() => {
-    setOpenAiKey(localStorage.getItem('openai_key') || '');
-    setNotionKey(localStorage.getItem('notion_key') || '');
-    setNotionDbId(localStorage.getItem('notion_db_id') || '');
+    // Clear old plaintext keys if they exist (migration to secure cookies)
+    localStorage.removeItem('openai_key');
+    localStorage.removeItem('notion_key');
+    localStorage.removeItem('notion_db_id');
+
+    fetch('/api/settings').then(res => res.json()).then(data => {
+      if (data.hasOpenAiKey) setOpenAiKey('********');
+      if (data.hasNotionKey) setNotionKey('********');
+      if (data.hasNotionDbId) setNotionDbId('********');
+    });
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem('openai_key', openAiKey);
-    localStorage.setItem('notion_key', notionKey);
-    localStorage.setItem('notion_db_id', notionDbId);
-    toast.success('Settings saved successfully!');
+  const handleSave = async () => {
+    const payload = {
+      openaiKey: openAiKey !== '********' ? openAiKey : undefined,
+      notionKey: notionKey !== '********' ? notionKey : undefined,
+      notionDbId: notionDbId !== '********' ? notionDbId : undefined,
+    };
+
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      toast.success('Settings securely saved!');
+    } else {
+      toast.error('Failed to save settings.');
+    }
   };
 
   return (

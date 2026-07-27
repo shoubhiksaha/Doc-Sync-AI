@@ -41,6 +41,8 @@ export async function syncToNotion(
       properties["Tare Weight"] = { number: factoryData.tareWeight as number };
       properties["Net Weight"] = { number: (factoryData.grossWeight as number) - (factoryData.tareWeight as number) };
       properties["Profile"] = { select: { name: 'Factory Weight Slip' } };
+    } else {
+      throw new Error('Unsupported profile ID');
     }
 
     const response = await notion.pages.create({

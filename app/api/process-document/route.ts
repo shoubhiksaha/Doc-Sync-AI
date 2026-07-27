@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
-import { extractDocumentData } from '@/lib/openai';
+import { runCodexPipeline } from '@/lib/codex-agent';
+import { getDecryptedCookie } from '@/lib/crypto';
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get('document') as File;
+    const file = formData.get('document') as File | null;
     const profileId = formData.get('profileId') as string;
-    const openaiKey = req.headers.get('x-openai-key');
+    
+    // Read key securely from HttpOnly cookie
+    const openaiKey = getDecryptedCookie(req, 'docsync_openai') || req.headers.get('x-openai-key') || undefined;
 
     if (!file) {
       return NextResponse.json({ error: 'No document provided' }, { status: 400 });
+    }
+
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'Invalid file type. Only images are allowed.' }, { status: 400 });
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'File size exceeds the 20MB limit.' }, { status: 413 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -31,22 +44,14 @@ export async function POST(req: NextRequest) {
       .webp({ quality: 68 })
       .toBuffer();
 
-    // Pass the OCR buffer to OpenAI for extraction
-    if (!openaiKey) {
-      return NextResponse.json({
-        success: true,
-        data: { date: '12-Aug-2023', vehicleNumber: 'MOCK-DATA', grossWeight: 5000, tareWeight: 1000 },
-        warning: 'No OpenAI key provided. Using mock data.',
-        _metadata: { processedAt: new Date().toISOString() }
-      });
-    }
-
-    const extractedData = await extractDocumentData(ocrBuffer, profileId, openaiKey);
+    // Pass the OCR buffer to Codex Pipeline for extraction
+    const { data: extractedData, auditLogs } = await runCodexPipeline(ocrBuffer, profileId, openaiKey);
 
     // Return the processed data to the client
     return NextResponse.json({ 
       success: true, 
       data: extractedData,
+      auditLogs,
       message: 'Processed successfully',
       stats: {
         originalSize: buffer.length,
@@ -57,7 +62,6 @@ export async function POST(req: NextRequest) {
     
   } catch (error: unknown) {
     console.error('Error processing document:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to process document';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'An internal error occurred during document processing.' }, { status: 500 });
   }
 }
