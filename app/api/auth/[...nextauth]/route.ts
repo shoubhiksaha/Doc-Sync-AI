@@ -11,8 +11,9 @@ const handler = NextAuth({
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          // Requesting scopes for Sheets and Drive (File creation only)
-          scope: "openid email profile https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file"
+          // Using drive.file scope allows creating/editing Sheets and Drive files securely, 
+          // but ONLY if the app created them.
+          scope: "openid email profile https://www.googleapis.com/auth/drive.file"
         }
       }
     }),
