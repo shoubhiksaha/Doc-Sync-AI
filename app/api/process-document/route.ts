@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
 
     // Read Notion key for image upload
     const notionKey = getDecryptedCookie(req, 'docsync_notion') || undefined;
+    const uploadDest = req.cookies.get('docsync_upload_dest')?.value || 'both'; // gdrive, notion, both
 
     if (!file) {
       return NextResponse.json({ error: 'No document provided' }, { status: 400 });
@@ -38,17 +39,11 @@ export async function POST(req: NextRequest) {
 
     console.log(`Processing image for profile: ${profileId}`);
 
-    // Dual-branch pipeline using sharp
-    // Branch 1: High-res for OCR (2048px max, JPEG 95)
+    // Single pipeline using sharp
+    // Optimize for both AI (max 2048px) and Archive (under 5MB for Notion, JPEG 95 quality usually < 1MB)
     const ocrBuffer = await sharp(buffer)
       .resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 95 })
-      .toBuffer();
-
-    // Branch 2: Low-res for Archive (1500px max, WebP 68)
-    const archiveBuffer = await sharp(buffer)
-      .resize({ width: 1500, height: 1500, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 68 })
       .toBuffer();
 
     // Run AI Codex pipeline on OCR buffer
@@ -56,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // Generate a filename for the archive
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const archiveFilename = `docsync-${profileId}-${timestamp}.webp`;
+    const archiveFilename = `docsync-${profileId}-${timestamp}.jpg`;
 
     // Upload archive buffer concurrently to GDrive and/or Notion (non-blocking to AI result)
     let imageUrl: string | null = null;
@@ -65,9 +60,9 @@ export async function POST(req: NextRequest) {
     const uploadPromises: Promise<void>[] = [];
 
     // Primary: Google Drive (preferred — gives a permanent public link)
-    if (googleAccessToken) {
+    if (googleAccessToken && (uploadDest === 'both' || uploadDest === 'gdrive')) {
       uploadPromises.push(
-        uploadArchiveToGDrive(archiveBuffer, archiveFilename, googleAccessToken).then((url) => {
+        uploadArchiveToGDrive(ocrBuffer, archiveFilename, googleAccessToken).then((url) => {
           imageUrl = url;
           console.log('Archive uploaded to GDrive:', url);
         })
@@ -75,14 +70,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Secondary: Notion (gives a file_upload ID to embed in the Notion page)
-    if (notionKey) {
+    if (notionKey && (uploadDest === 'both' || uploadDest === 'notion')) {
       uploadPromises.push(
-        uploadArchiveToNotion(archiveBuffer, archiveFilename, notionKey).then((fileId) => {
+        uploadArchiveToNotion(ocrBuffer, archiveFilename, notionKey).then((fileId) => {
           notionFileId = fileId;
-          // If GDrive failed, fall back to a Notion URL placeholder
-          if (!imageUrl && fileId) {
-            imageUrl = `notion://file_upload/${fileId}`;
-          }
+          // If GDrive failed or wasn't used, we'll populate this later from Notion sync response url
           console.log('Archive uploaded to Notion, fileId:', fileId);
         })
       );
@@ -100,8 +92,7 @@ export async function POST(req: NextRequest) {
       message: 'Processed successfully',
       stats: {
         originalSize: buffer.length,
-        ocrSize: ocrBuffer.length,
-        archiveSize: archiveBuffer.length,
+        processedSize: ocrBuffer.length,
       },
     });
 

@@ -27,6 +27,24 @@ export async function POST(req: NextRequest) {
     const notionKey = getDecryptedCookie(req, 'docsync_notion') || req.headers.get('x-notion-key');
     const notionDbId = getDecryptedCookie(req, 'docsync_notion_db') || req.headers.get('x-notion-db-id');
 
+    // --- Notion Sync (Run first so we can grab the URL for Sheets if needed) ---
+    const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, notionFileId);
+    let notionResult;
+    try {
+      notionResult = await notionPromise;
+    } catch {
+      notionResult = { success: false, mock: false, url: null };
+    }
+
+    // Determine the final link to store in Sheets
+    // Priority: GDrive link > Notion Page URL > placeholder
+    let finalLinkToImage = imageUrl;
+    if (!finalLinkToImage && notionResult.url) {
+      finalLinkToImage = notionResult.url;
+    } else if (!finalLinkToImage) {
+      finalLinkToImage = '—';
+    }
+
     // --- Google Sheets Sync ---
     const spreadsheetId = clientSheetId || process.env.GOOGLE_SHEET_ID;
 
@@ -49,27 +67,24 @@ export async function POST(req: NextRequest) {
       let rowValues: unknown[];
 
       if (schemaKeys) {
-        // Dynamic mapping using saved column schema
         rowValues = schemaKeys.map((key) => {
           if (key === 'synced_at') return new Date().toISOString();
           if (key === 'sync_status') return 'Success';
-          if (key === 'link_to_image') return imageUrl || '—';
+          if (key === 'link_to_image') return finalLinkToImage;
           if (key === 'net_weight') {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const fw = data as any;
             return (fw.grossWeight ?? 0) - (fw.tareWeight ?? 0);
           }
-          // Convert snake_case → camelCase for data lookup
           const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return (data as any)[camelKey] ?? (data as any)[key] ?? '';
         });
       } else {
-        // Legacy static fallback
         const baseRow = profileId === 'ngo-receipt'
           ? [data.date, data.donorName, data.amount, data.panNumber || '']
           : [data.date, data.vehicleNumber, data.grossWeight, data.tareWeight];
-        rowValues = [...baseRow, imageUrl || '—', new Date().toISOString(), 'Success'];
+        rowValues = [...baseRow, finalLinkToImage, new Date().toISOString(), 'Success'];
       }
 
       await sheets.spreadsheets.values.append({
@@ -82,22 +97,24 @@ export async function POST(req: NextRequest) {
       return { success: true };
     })();
 
-    // --- Notion Sync ---
-    const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, notionFileId);
-
-    const [sheetsResult, notionResult] = await Promise.allSettled([sheetsPromise, notionPromise]);
+    let sheetsResult;
+    try {
+      sheetsResult = await sheetsPromise;
+    } catch {
+      sheetsResult = { success: false };
+    }
 
     const errors: string[] = [];
     const syncDetails: Record<string, string> = {};
 
-    if (notionResult.status === 'rejected') {
+    if (!notionResult.success && !notionResult.mock && notionResult.url !== null) {
       errors.push('Notion Sync Failed');
       syncDetails.notion = 'failed';
     } else {
       syncDetails.notion = notionKey ? 'success' : 'skipped';
     }
 
-    if (sheetsResult.status === 'rejected') {
+    if (!sheetsResult.success) {
       errors.push('Google Sheets Sync Failed');
       syncDetails.sheets = 'failed';
     } else {

@@ -3,7 +3,7 @@ import { encrypt } from '@/lib/crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    const { openaiKey, notionKey, notionDbId } = await req.json();
+    const { openaiKey, notionKey, notionDbId, uploadDest } = await req.json();
     
     const response = NextResponse.json({ success: true });
     
@@ -32,7 +32,11 @@ export async function POST(req: NextRequest) {
     } else if (notionDbId === '') {
       response.cookies.delete('docsync_notion_db');
     }
-    
+    if (uploadDest) {
+      // Not sensitive, no encryption needed
+      response.cookies.set('docsync_upload_dest', uploadDest, cookieOptions);
+    }
+
     return response;
   } catch {
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
@@ -43,6 +47,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     hasOpenAiKey: !!req.cookies.get('docsync_openai'),
     hasNotionKey: !!req.cookies.get('docsync_notion'),
-    hasNotionDbId: !!req.cookies.get('docsync_notion_db')
+    hasNotionDbId: !!req.cookies.get('docsync_notion_db'),
+    uploadDest: req.cookies.get('docsync_upload_dest')?.value || 'both'
   });
 }

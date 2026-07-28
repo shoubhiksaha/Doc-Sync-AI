@@ -6,6 +6,7 @@ export default function SettingsPage() {
   const [openAiKey, setOpenAiKey] = useState('');
   const [notionKey, setNotionKey] = useState('');
   const [notionDbId, setNotionDbId] = useState('');
+  const [uploadDest, setUploadDest] = useState('both');
 
   // Load from API on mount
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function SettingsPage() {
       if (data.hasOpenAiKey) setOpenAiKey('********');
       if (data.hasNotionKey) setNotionKey('********');
       if (data.hasNotionDbId) setNotionDbId('********');
+      if (data.uploadDest) setUploadDest(data.uploadDest);
     });
   }, []);
 
@@ -26,6 +28,7 @@ export default function SettingsPage() {
       openaiKey: openAiKey !== '********' ? openAiKey : undefined,
       notionKey: notionKey !== '********' ? notionKey : undefined,
       notionDbId: notionDbId !== '********' ? notionDbId : undefined,
+      uploadDest,
     };
 
     const res = await fetch('/api/settings', {
@@ -110,6 +113,28 @@ export default function SettingsPage() {
               value={notionDbId}
               onChange={(e) => setNotionDbId(e.target.value)}
             />
+          </div>
+        </section>
+
+        {/* Upload Settings */}
+        <section className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>🖼️</span> Image Archive Destination
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            Where should the scanned document images be uploaded? Note: Notion links are private (only accessible while logged into your Notion account). GDrive links are publicly viewable.
+          </p>
+          <div className="form-group">
+            <label className="form-label">Upload Images To:</label>
+            <select 
+              className="form-input" 
+              value={uploadDest}
+              onChange={(e) => setUploadDest(e.target.value)}
+            >
+              <option value="both">Both Google Drive & Notion</option>
+              <option value="gdrive">Google Drive Only</option>
+              <option value="notion">Notion Only</option>
+            </select>
           </div>
         </section>
 
