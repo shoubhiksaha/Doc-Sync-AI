@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast, { Toaster } from 'react-hot-toast';
 import { NgoReceiptSchema, FactoryWeightSlipSchema } from '@/lib/schemas';
-import SheetSetupModal from '@/app/components/SheetSetupModal';
-import type { SuggestedField } from '@/app/api/sheets/suggest-schema/route';
+import SheetSetupModal, { type SuggestedField } from '@/app/components/SheetSetupModal';
 
 type ProcessingStats = {
   originalSize: number;

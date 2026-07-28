@@ -1,7 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import type { SuggestedField } from '@/app/api/sheets/suggest-schema/route';
+
+// Inlined to avoid cross-boundary server-route imports in client components
+export type SuggestedField = {
+  key: string;
+  label: string;
+  example: string;
+  confidence: number;
+  reason: string;
+  required: boolean;
+};
 
 interface SheetSetupModalProps {
   profileId: string;

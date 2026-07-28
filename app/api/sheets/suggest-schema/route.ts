@@ -3,13 +3,14 @@ import { OpenAI } from 'openai';
 import { getDecryptedCookie } from '@/lib/crypto';
 
 export type SuggestedField = {
-  key: string;        // machine key, e.g. "donor_name"
-  label: string;      // human label, e.g. "Donor Name"
-  example: string;    // value from the extracted data, e.g. "Rahul Sharma"
-  confidence: number; // 0-100
-  reason: string;     // why this field is included / why confidence is low
+  key: string;
+  label: string;
+  example: string;
+  confidence: number;
+  reason: string;
   required: boolean;
 };
+
 
 export async function POST(req: NextRequest) {
   try {
