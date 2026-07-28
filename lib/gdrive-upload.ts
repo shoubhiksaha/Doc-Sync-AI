@@ -3,8 +3,8 @@ import { Readable } from 'stream';
 
 /**
  * Uploads a WebP archive buffer to Google Drive (using drive.file scope).
- * Makes the file publicly viewable and returns a shareable link.
- * Returns null if the upload fails (non-fatal - sync continues without image link).
+ * Makes the file private (accessible only to the user when logged into Google).
+ * Returns a link to view the file. Returns null if upload fails (non-fatal).
  */
 export async function uploadArchiveToGDrive(
   buffer: Buffer,
@@ -36,12 +36,7 @@ export async function uploadArchiveToGDrive(
       return null;
     }
 
-    // Make the file publicly readable (anyone with the link can view)
-    // This is allowed under drive.file scope for files this app created.
-    await drive.permissions.create({
-      fileId,
-      requestBody: { role: 'reader', type: 'anyone' },
-    });
+    // Link is private by default since we no longer create the "anyone" permission
 
     return `https://drive.google.com/file/d/${fileId}/view`;
   } catch (err) {

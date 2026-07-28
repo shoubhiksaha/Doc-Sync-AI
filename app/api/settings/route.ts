@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict' as const,
       path: '/',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 365 * 10, // 10 years (as permanent as possible without DB)
     };
 
     if (openaiKey) {

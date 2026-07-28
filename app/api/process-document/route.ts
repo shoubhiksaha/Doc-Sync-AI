@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     // Read Notion key for image upload
     const notionKey = getDecryptedCookie(req, 'docsync_notion') || undefined;
-    const uploadDest = req.cookies.get('docsync_upload_dest')?.value || 'both'; // gdrive, notion, both
+    const uploadDest = req.cookies.get('docsync_upload_dest')?.value || 'gdrive'; // gdrive, notion, both
 
     if (!file) {
       return NextResponse.json({ error: 'No document provided' }, { status: 400 });
@@ -41,10 +41,19 @@ export async function POST(req: NextRequest) {
 
     // Single pipeline using sharp
     // Optimize for both AI (max 2048px) and Archive (under 5MB for Notion, JPEG 95 quality usually < 1MB)
-    const ocrBuffer = await sharp(buffer)
+    let ocrBuffer = await sharp(buffer)
       .resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 95 })
       .toBuffer();
+
+    // Explicit check for Notion's 5MB upload limit (just in case)
+    if (ocrBuffer.length > 5 * 1024 * 1024) {
+      console.warn("Buffer exceeded 5MB. Running aggressive compression for upload...");
+      ocrBuffer = await sharp(buffer)
+        .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 60 })
+        .toBuffer();
+    }
 
     // Run AI Codex pipeline on OCR buffer
     const { data: extractedData, auditLogs } = await runCodexPipeline(ocrBuffer, profileId, openaiKey);

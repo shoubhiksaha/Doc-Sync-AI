@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     try {
       notionResult = await notionPromise;
     } catch {
-      notionResult = { success: false, mock: false, url: null };
+      notionResult = { success: false, dummy: false, url: null };
     }
 
     // Determine the final link to store in Sheets
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     const errors: string[] = [];
     const syncDetails: Record<string, string> = {};
 
-    if (!notionResult.success && !notionResult.mock && notionResult.url !== null) {
+    if (!notionResult.success && !('dummy' in notionResult && notionResult.dummy) && notionResult.url !== null) {
       errors.push('Notion Sync Failed');
       syncDetails.notion = 'failed';
     } else {

@@ -12,9 +12,10 @@ export default function InitialSetupModal() {
   const [notionDb, setNotionDb] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Close modal and set cookie so it doesn't show again
-  const skipSetup = () => {
-    document.cookie = "docsync_notion_skipped=true; path=/; max-age=31536000";
+  const skipSetup = async () => {
+    document.cookie = "docsync_notion_skipped=true; path=/; max-age=315360000"; // 10 years
+    // Set default destination to GDrive if they skip Notion
+    document.cookie = "docsync_upload_dest=gdrive; path=/; max-age=315360000";
     setIsOpen(false);
     toast.success("Skipped! We'll just use Google Sheets & Drive for now.");
   };
@@ -27,7 +28,11 @@ export default function InitialSetupModal() {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notionKey, notionDb }),
+        body: JSON.stringify({ 
+          notionKey, 
+          notionDb,
+          uploadDest: 'notion' // Default to Notion only if they bother setting it up now
+        }),
       });
       
       const data = await res.json();
@@ -68,7 +73,7 @@ export default function InitialSetupModal() {
             <span>📝</span> Optional: Connect Notion
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
-            Sync your extracted data directly into a Notion Database.
+            Sync extracted data & images directly into a Notion Database. <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Saves your Google Drive space!</span>
           </p>
         </div>
 
