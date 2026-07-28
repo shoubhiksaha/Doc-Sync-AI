@@ -1,8 +1,17 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import InitialSetupModal from './components/InitialSetupModal';
 
 export default function Home() {
+  const cookieStore = cookies();
+  const hasNotionKey = cookieStore.has('docsync_notion');
+  const hasSkippedNotion = cookieStore.has('docsync_notion_skipped');
+  const showNotionSetup = !hasNotionKey && !hasSkippedNotion;
+
   return (
     <main className="container flex-col items-center justify-center animate-fade-in" style={{ minHeight: '100vh', display: 'flex' }}>
+      
+      {showNotionSetup && <InitialSetupModal />}
       
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <h1 className="text-gradient" style={{ fontSize: '3rem', marginBottom: '1rem' }}>DocSync AI</h1>
