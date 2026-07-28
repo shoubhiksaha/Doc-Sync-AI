@@ -39,6 +39,9 @@ export default function ScanPage() {
   const [suggestedFields, setSuggestedFields] = useState<SuggestedField[]>([]);
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
+  // Image archive links (from process-document)
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [notionFileId, setNotionFileId] = useState<string | null>(null);
   // Pending data to sync once sheet is created
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pendingSyncData, setPendingSyncData] = useState<Record<string, any> | null>(null);
@@ -76,8 +79,12 @@ export default function ScanPage() {
         reset(data.data);
         setStats(data.stats);
         if (data.auditLogs) setAuditLogs(data.auditLogs);
+        // Store image references for sync
+        if (data.imageUrl) setImageUrl(data.imageUrl);
+        if (data.notionFileId) setNotionFileId(data.notionFileId);
         setHasExtracted(true);
-        toast.success("Document analyzed successfully!");
+        const uploadMsg = data.imageUrl ? ' Image archived to Drive ✓' : '';
+        toast.success(`Document analyzed!${uploadMsg}`);
       } else {
         toast.error(data.error || 'Failed to process document');
       }
@@ -105,7 +112,7 @@ export default function ScanPage() {
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, profileId, spreadsheetId: sheetId, columns: cols }),
+        body: JSON.stringify({ data, profileId, spreadsheetId: sheetId, columns: cols, imageUrl, notionFileId }),
       });
       const result = await res.json();
       if (result.success) {

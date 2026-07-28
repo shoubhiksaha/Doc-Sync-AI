@@ -1,29 +1,24 @@
 import { Client } from '@notionhq/client';
-// In a real scenario, you'd import NotionMultipartUploader here if you needed file uploads
-// import NotionMultipartUploader from 'notion-multipart-uploader';
 import { NgoReceiptData, FactoryWeightSlipData } from "./schemas";
 
 export async function syncToNotion(
-  data: NgoReceiptData | FactoryWeightSlipData, 
+  data: NgoReceiptData | FactoryWeightSlipData,
   profileId: string,
   customNotionKey?: string | null,
-  customDbId?: string | null
+  customDbId?: string | null,
+  notionFileId?: string | null // file_upload ID from notion-multipart-uploader
 ) {
-  // If no Notion integration keys are configured, return mock success
   const apiKey = customNotionKey || process.env.NOTION_API_KEY;
   const databaseId = customDbId || process.env.NOTION_DATABASE_ID;
 
   if (!apiKey || !databaseId) {
-    console.warn("Notion keys missing. Skipping external sync.");
+    console.warn("Notion keys missing. Skipping Notion sync.");
     return { success: true, dummy: true };
   }
 
   const notion = new Client({ auth: apiKey });
 
   try {
-    if (!databaseId) throw new Error("Missing NOTION_DATABASE_ID");
-
-    // Map data to Notion properties based on profile
     const properties: Record<string, unknown> = {
       "Date": { date: { start: data.date as string } },
     };
@@ -45,10 +40,25 @@ export async function syncToNotion(
       throw new Error('Unsupported profile ID');
     }
 
+    // Build page children: image block if we have a file upload ID
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const children: any[] = [];
+    if (notionFileId) {
+      children.push({
+        object: 'block',
+        type: 'image',
+        image: {
+          type: 'file_upload',
+          file_upload: { id: notionFileId },
+        },
+      });
+    }
+
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       properties: properties as any,
+      ...(children.length > 0 && { children }),
     });
 
     return { success: true, id: response.id };

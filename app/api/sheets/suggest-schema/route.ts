@@ -89,6 +89,7 @@ function getStaticDefaults(profileId: string, extractedData: Record<string, unkn
       { key: 'donor_name', label: 'Donor Name', example: String(extractedData.donorName || ''), confidence: 95, reason: 'Directly extracted', required: true },
       { key: 'amount', label: 'Amount (₹)', example: String(extractedData.amount || ''), confidence: 95, reason: 'Directly extracted', required: true },
       { key: 'pan_number', label: 'PAN Number', example: String(extractedData.panNumber || ''), confidence: 80, reason: 'May be absent on small receipts', required: false },
+      { key: 'link_to_image', label: 'Link to Image', example: 'https://drive.google.com/file/d/...', confidence: 100, reason: 'Auto-uploaded archive WebP (Google Drive or Notion)', required: true },
       { key: 'synced_at', label: 'Synced At', example: new Date().toISOString(), confidence: 100, reason: 'Auto-generated timestamp', required: true },
       { key: 'sync_status', label: 'Sync Status', example: 'Success', confidence: 100, reason: 'Auto-generated status', required: true },
     ];
@@ -99,7 +100,9 @@ function getStaticDefaults(profileId: string, extractedData: Record<string, unkn
     { key: 'gross_weight', label: 'Gross Weight (kg)', example: String(extractedData.grossWeight || ''), confidence: 95, reason: 'Directly extracted', required: true },
     { key: 'tare_weight', label: 'Tare Weight (kg)', example: String(extractedData.tareWeight || ''), confidence: 95, reason: 'Directly extracted', required: true },
     { key: 'net_weight', label: 'Net Weight (kg)', example: String((Number(extractedData.grossWeight || 0) - Number(extractedData.tareWeight || 0)) || ''), confidence: 60, reason: 'Derived: Gross - Tare. Verify formula is correct.', required: false },
+    { key: 'link_to_image', label: 'Link to Image', example: 'https://drive.google.com/file/d/...', confidence: 100, reason: 'Auto-uploaded archive WebP (Google Drive or Notion)', required: true },
     { key: 'synced_at', label: 'Synced At', example: new Date().toISOString(), confidence: 100, reason: 'Auto-generated timestamp', required: true },
     { key: 'sync_status', label: 'Sync Status', example: 'Success', confidence: 100, reason: 'Auto-generated status', required: true },
   ];
 }
+
