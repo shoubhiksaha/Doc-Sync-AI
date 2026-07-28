@@ -46,20 +46,27 @@ export default function SettingsPage() {
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '2rem', marginBottom: '2rem' }}>Settings & Integrations</h1>
 
-        {/* OpenAI Section */}
+        {/* OpenAI / GitHub Models Section */}
         <section className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>🧠</span> OpenAI (BYOK)
+            <span>🧠</span> AI Model Key (BYOK)
           </h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            DocSync AI uses gpt-4o-mini and gpt-4o for document extraction. Bring your own key.
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            DocSync AI uses <strong>gpt-4o-mini</strong> and <strong>gpt-4o</strong> for document extraction. You can use:
           </p>
+          <ul style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem', paddingLeft: '1.25rem', lineHeight: 1.8 }}>
+            <li><strong>OpenAI API key</strong> — starts with <code>sk-</code> (paid, from platform.openai.com)</li>
+            <li><strong>GitHub Personal Access Token</strong> — starts with <code>ghp_</code> or <code>github_pat_</code> (free! via GitHub Marketplace Models)</li>
+          </ul>
+          <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', fontSize: '0.8rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
+            💡 <strong>Get a free GitHub token:</strong> Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>github.com/settings/tokens</a> → Generate new token (classic) → no scopes needed → copy the <code>ghp_...</code> token.
+          </div>
           <div className="form-group">
-            <label className="form-label">OpenAI API Key</label>
+            <label className="form-label">OpenAI API Key or GitHub PAT</label>
             <input 
               type="password" 
               className="form-input" 
-              placeholder="sk-..." 
+              placeholder="sk-... or ghp_... or github_pat_..." 
               value={openAiKey}
               onChange={(e) => setOpenAiKey(e.target.value)}
             />
