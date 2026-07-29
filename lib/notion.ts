@@ -1,4 +1,5 @@
 import { Client } from '@notionhq/client';
+import { uploadToNotion } from 'notion-multipart-uploader';
 import { NgoReceiptData, FactoryWeightSlipData } from "./schemas";
 
 export async function syncToNotion(
@@ -6,14 +7,14 @@ export async function syncToNotion(
   profileId: string,
   customNotionKey?: string | null,
   customDbId?: string | null,
-  notionFileId?: string | null // file_upload ID from notion-multipart-uploader
+  archiveBuffer?: Buffer | null
 ) {
   const apiKey = customNotionKey || process.env.NOTION_API_KEY;
   const databaseId = customDbId || process.env.NOTION_DATABASE_ID;
 
   if (!apiKey || !databaseId) {
     console.warn("Notion keys missing. Skipping Notion sync.");
-    return { success: true, dummy: true };
+    return { success: true, dummy: true, url: null };
   }
 
   const notion = new Client({ auth: apiKey });
@@ -26,59 +27,60 @@ export async function syncToNotion(
     if (profileId === 'ngo-receipt') {
       const ngoData = data as NgoReceiptData;
       properties["Name"] = { title: [{ text: { content: ngoData.donorName as string } }] };
-      properties["Amount"] = { number: ngoData.amount as number };
+      properties["Amount"] = { number: Number(ngoData.amount) || 0 };
       properties["PAN"] = { rich_text: [{ text: { content: (ngoData.panNumber as string) || '' } }] };
       properties["Profile"] = { select: { name: 'NGO Receipt' } };
     } else if (profileId === 'factory-weight-slip') {
       const factoryData = data as FactoryWeightSlipData;
       properties["Name"] = { title: [{ text: { content: factoryData.vehicleNumber as string } }] };
-      properties["Gross Weight"] = { number: factoryData.grossWeight as number };
-      properties["Tare Weight"] = { number: factoryData.tareWeight as number };
-      properties["Net Weight"] = { number: (factoryData.grossWeight as number) - (factoryData.tareWeight as number) };
+      properties["Gross Weight"] = { number: Number(factoryData.grossWeight) || 0 };
+      properties["Tare Weight"] = { number: Number(factoryData.tareWeight) || 0 };
+      properties["Net Weight"] = { number: (Number(factoryData.grossWeight) || 0) - (Number(factoryData.tareWeight) || 0) };
       properties["Profile"] = { select: { name: 'Factory Weight Slip' } };
     } else {
       throw new Error('Unsupported profile ID');
     }
 
-    // Build page children: image block and data payload block
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const children: any[] = [];
-    if (notionFileId) {
-      children.push({
-        object: 'block',
-        type: 'image',
-        image: {
-          type: 'file_upload',
-          file_upload: { id: notionFileId },
-        },
-      });
-    }
-
     // Add confirmed text from the review
-    children.push({
-      object: 'block',
-      type: 'code',
-      code: {
-        language: 'json',
-        rich_text: [{
-          type: 'text',
-          text: { content: JSON.stringify(data, null, 2) }
-        }]
+    const children = [
+      {
+        object: 'block',
+        type: 'code',
+        code: {
+          rich_text: [{ type: 'text', text: { content: JSON.stringify(data, null, 2) } }],
+          language: 'json',
+        },
       }
-    });
+    ];
 
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: properties as any,
-      ...(children.length > 0 && { children }),
+      properties,
+      children: children as any,
     });
 
-    // Extract the URL using any to bypass strict PartialPageObjectResponse typing
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pageUrl = (response as any).url;
+    let uploadedUrl = null;
     
-    return { success: true, id: response.id, url: pageUrl };
+    // Upload image to the created page if buffer is provided
+    if (archiveBuffer) {
+      try {
+        await uploadToNotion(notion, {
+          pageId: response.id,
+          fileBuffer: archiveBuffer,
+          fileName: `${profileId}_${Date.now()}.webp`,
+          mimeType: 'image/webp',
+        });
+        // We consider the page URL as the image link for the spreadsheet since the image is inside it
+        uploadedUrl = ('url' in response) ? response.url : null;
+      } catch (uploadError) {
+        console.error('Failed to upload image to Notion page:', uploadError);
+      }
+    }
+
+    return { 
+      success: true, 
+      url: uploadedUrl || (('url' in response) ? response.url : null) 
+    };
   } catch (error) {
     console.error("Notion sync error:", error);
     throw new Error("Failed to sync to Notion");

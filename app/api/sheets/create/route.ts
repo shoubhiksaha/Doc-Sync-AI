@@ -28,6 +28,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Silently append metadata tracking columns
+    const finalColumns = [
+      ...columns,
+      { key: 'link_to_image', label: 'Link to Image' },
+      { key: 'synced_at', label: 'Synced At' },
+      { key: 'sync_status', label: 'Sync Status' },
+    ];
+
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
 
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
     const sheetName = profileId === 'ngo-receipt' ? 'NGO_Receipts' : 'Factory_Slips';
 
     // Write the header row
-    const headers = columns.map((c) => c.label);
+    const headers = finalColumns.map((c) => c.label);
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetName}!A1`,
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
               cell: {
                 userEnteredFormat: {
                   textFormat: { bold: true },
-                  backgroundColor: { red: 0.24, green: 0.22, blue: 0.55 }, // indigo
+                  backgroundColor: { red: 0.85, green: 0.92, blue: 0.98 }, // light blue
                   horizontalAlignment: 'CENTER',
                 },
               },
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     // Also store the column schema (so sync route knows field order)
     const schemaCookieName = `docsync_schema_${profileId.replace(/-/g, '_')}`;
-    cookies().set(schemaCookieName, JSON.stringify(columns.map(c => c.key)), {
+    cookies().set(schemaCookieName, JSON.stringify(finalColumns.map(c => c.key)), {
       httpOnly: false,
       sameSite: 'lax',
       path: '/',
@@ -116,8 +124,11 @@ export async function POST(req: NextRequest) {
       message: `Sheet "${sheetTitle}" created with ${headers.length} columns.`,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sheet creation error:', error);
-    return NextResponse.json({ error: 'Failed to create Google Sheet. Make sure you are signed in with Google.' }, { status: 500 });
+    const errorMessage = error?.response?.data?.error?.message || error.message || 'Unknown error';
+    return NextResponse.json({ 
+      error: `Failed to create Google Sheet. Google says: ${errorMessage}` 
+    }, { status: 500 });
   }
 }
