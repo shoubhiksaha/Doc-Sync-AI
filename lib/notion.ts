@@ -1,5 +1,5 @@
 import { Client } from '@notionhq/client';
-import { BlockObjectRequest, CreatePageBodyParameters } from '@notionhq/client/build/src/api-endpoints';
+import { BlockObjectRequest, CreatePageParameters } from '@notionhq/client/build/src/api-endpoints';
 import { uploadToNotion } from 'notion-multipart-uploader';
 import { NgoReceiptData, FactoryWeightSlipData } from "./schemas";
 
@@ -21,7 +21,7 @@ export async function syncToNotion(
   const notion = new Client({ auth: apiKey });
 
   try {
-    type NotionProperties = NonNullable<CreatePageBodyParameters['properties']>;
+    type NotionProperties = NonNullable<CreatePageParameters['properties']>;
     const properties: NotionProperties = {
       "Date": { date: { start: data.date as string } },
     };
