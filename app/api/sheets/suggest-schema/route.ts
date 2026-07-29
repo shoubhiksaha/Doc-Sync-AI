@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { OpenAI } from 'openai';
-import { getDecryptedCookie } from '@/lib/crypto';
+import OpenAI from 'openai';
+import { loadSettings } from '@/lib/settings-loader';
 
 export type SuggestedField = {
   key: string;
@@ -21,9 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing extractedData or profileId' }, { status: 400 });
     }
 
-    const openaiKey = getDecryptedCookie(req, 'docsync_openai')
-      || process.env.OPENAI_API_KEY
-      || process.env.GITHUB_TOKEN;
+    const { openaiKey: loadedOpenaiKey } = await loadSettings(req);
+    const openaiKey = loadedOpenaiKey || req.headers.get('x-openai-key') || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN || undefined;
 
     // If no AI key, return smart static defaults based on profile
     if (!openaiKey) {

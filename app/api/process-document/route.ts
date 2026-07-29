@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { runCodexPipeline } from '@/lib/codex-agent';
-import { getDecryptedCookie } from '@/lib/crypto';
+import { loadSettings } from '@/lib/settings-loader';
 import { getToken } from 'next-auth/jwt';
 import { uploadArchiveToGDrive } from '@/lib/gdrive-upload';
 import { uploadArchiveToNotion } from '@/lib/notion-upload';
@@ -17,12 +17,10 @@ export async function POST(req: NextRequest) {
     const file = formData.get('document') as File | null;
     const profileId = formData.get('profileId') as string;
 
-    // Read AI key from HttpOnly cookie
-    const openaiKey = getDecryptedCookie(req, 'docsync_openai') || req.headers.get('x-openai-key') || undefined;
-
-    // Read Notion key for image upload
-    const notionKey = getDecryptedCookie(req, 'docsync_notion') || undefined;
-    const uploadDest = req.cookies.get('docsync_upload_dest')?.value || 'gdrive'; // gdrive, notion, both
+    // Try API Headers first (for potential external CLI/App clients)
+    const { openaiKey, notionKey, uploadDest } = await loadSettings(req);
+    const resolvedOpenaiKey = req.headers.get('x-openai-key') || openaiKey;
+    const resolvedNotionKey = req.headers.get('x-notion-key') || notionKey;
 
     if (!file) {
       return NextResponse.json({ error: 'No document provided' }, { status: 400 });
@@ -56,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Run AI Codex pipeline on OCR buffer
-    const { data: extractedData, auditLogs } = await runCodexPipeline(ocrBuffer, profileId, openaiKey);
+    const { data: extractedData, auditLogs } = await runCodexPipeline(ocrBuffer, profileId, resolvedOpenaiKey);
 
     // Generate a filename for the archive
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -79,9 +77,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Secondary: Notion (gives a file_upload ID to embed in the Notion page)
-    if (notionKey && (uploadDest === 'both' || uploadDest === 'notion')) {
+    if (resolvedNotionKey && (uploadDest === 'both' || uploadDest === 'notion')) {
       uploadPromises.push(
-        uploadArchiveToNotion(ocrBuffer, archiveFilename, notionKey).then((fileId) => {
+        uploadArchiveToNotion(ocrBuffer, archiveFilename, resolvedNotionKey).then((fileId) => {
           notionFileId = fileId;
           // If GDrive failed or wasn't used, we'll populate this later from Notion sync response url
           console.log('Archive uploaded to Notion, fileId:', fileId);

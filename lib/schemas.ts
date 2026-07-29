@@ -7,8 +7,7 @@ export const NgoReceiptSchema = z.object({
   panNumber: z.string()
     .transform(val => val.replace(/\s+/g, '').toUpperCase())
     .pipe(z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'))
-    .optional()
-    .or(z.literal('')),
+    .nullable(),
 });
 
 export const FactoryWeightSlipSchema = z.object({
