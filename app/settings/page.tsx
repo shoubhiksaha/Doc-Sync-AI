@@ -7,6 +7,7 @@ export default function SettingsPage() {
   const [notionKey, setNotionKey] = useState('');
   const [notionDbId, setNotionDbId] = useState('');
   const [uploadDest, setUploadDest] = useState('both');
+  const [persistent, setPersistent] = useState(false);
 
   // Load from API on mount
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       if (data.hasNotionKey) setNotionKey('********');
       if (data.hasNotionDbId) setNotionDbId('********');
       if (data.uploadDest) setUploadDest(data.uploadDest);
+      if (data.isPersistent) setPersistent(true);
     });
   }, []);
 
@@ -29,6 +31,7 @@ export default function SettingsPage() {
       notionKey: notionKey !== '********' ? notionKey : undefined,
       notionDbId: notionDbId !== '********' ? notionDbId : undefined,
       uploadDest,
+      persistent,
     };
 
     const res = await fetch('/api/settings', {
@@ -135,6 +138,34 @@ export default function SettingsPage() {
               <option value="gdrive">Google Drive Only</option>
               <option value="notion">Notion Only</option>
             </select>
+          </div>
+        </section>
+        
+        {/* Security / Persistent Mode */}
+        <section className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem', border: '1px solid var(--accent-primary)' }}>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>🔐</span> Security Mode
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+            <input 
+              type="checkbox" 
+              id="persistent-mode"
+              checked={persistent}
+              onChange={(e) => setPersistent(e.target.checked)}
+              style={{ marginTop: '4px', width: '1.2rem', height: '1.2rem', accentColor: 'var(--accent-primary)' }}
+            />
+            <div>
+              <label htmlFor="persistent-mode" style={{ display: 'block', fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem', cursor: 'pointer' }}>
+                Remember my keys across devices (Persistent Mode)
+              </label>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+                {persistent ? (
+                  <><strong>Persistent Mode:</strong> Your keys will be securely encrypted using Google Cloud KMS and saved to your account in Firestore. They will survive cookie clears and sync across devices.</>
+                ) : (
+                  <><strong>Stateless Mode (Default):</strong> Maximum privacy. Keys are saved only in an encrypted HttpOnly cookie on this specific device. They are never written to our database.</>
+                )}
+              </p>
+            </div>
           </div>
         </section>
 

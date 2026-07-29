@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncToNotion } from '@/lib/notion';
-import { getDecryptedCookie } from '@/lib/crypto';
+import { loadSettings } from '@/lib/settings-loader';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
 
@@ -24,8 +24,9 @@ export async function POST(req: NextRequest) {
 
     console.log(`Syncing data for ${profileId}... imageUrl: ${imageUrl || 'none'}`);
 
-    const notionKey = getDecryptedCookie(req, 'docsync_notion') || req.headers.get('x-notion-key');
-    const notionDbId = getDecryptedCookie(req, 'docsync_notion_db') || req.headers.get('x-notion-db-id');
+    const { notionKey: loadedNotionKey, notionDbId: loadedNotionDbId } = await loadSettings(req);
+    const notionKey = req.headers.get('x-notion-key') || loadedNotionKey;
+    const notionDbId = req.headers.get('x-notion-db-id') || loadedNotionDbId;
 
     // --- Notion Sync (Run first so we can grab the URL for Sheets if needed) ---
     const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, notionFileId);
