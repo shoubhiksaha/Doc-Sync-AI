@@ -1,5 +1,5 @@
 import { Client } from '@notionhq/client';
-import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
+import { BlockObjectRequest, CreatePageBodyParameters } from '@notionhq/client/build/src/api-endpoints';
 import { uploadToNotion } from 'notion-multipart-uploader';
 import { NgoReceiptData, FactoryWeightSlipData } from "./schemas";
 
@@ -21,7 +21,8 @@ export async function syncToNotion(
   const notion = new Client({ auth: apiKey });
 
   try {
-    const properties: Record<string, unknown> = {
+    type NotionProperties = NonNullable<CreatePageBodyParameters['properties']>;
+    const properties: NotionProperties = {
       "Date": { date: { start: data.date as string } },
     };
 
@@ -42,17 +43,44 @@ export async function syncToNotion(
       throw new Error('Unsupported profile ID');
     }
 
-    // Add confirmed text from the review
-    const children: BlockObjectRequest[] = [
-      {
-        object: 'block',
-        type: 'code',
-        code: {
-          rich_text: [{ type: 'text', text: { content: JSON.stringify(data, null, 2) } }],
-          language: 'json',
-        },
+    let notionFileId: string | null = null;
+    
+    // Upload image to Notion's S3 first to get a file ID
+    if (archiveBuffer) {
+      try {
+        notionFileId = await uploadToNotion(
+          apiKey,
+          archiveBuffer,
+          'image/webp',
+          `${profileId}_${Date.now()}.webp`
+        );
+      } catch (uploadError) {
+        console.error('Failed to upload image to Notion S3:', uploadError);
       }
-    ];
+    }
+
+    const children: BlockObjectRequest[] = [];
+    
+    if (notionFileId) {
+      children.push({
+        object: 'block',
+        type: 'image',
+        image: {
+          type: 'file_upload',
+          file_upload: { id: notionFileId }
+        }
+      } as BlockObjectRequest);
+    }
+
+    // Add confirmed text from the review
+    children.push({
+      object: 'block',
+      type: 'code',
+      code: {
+        rich_text: [{ type: 'text', text: { content: JSON.stringify(data, null, 2) } }],
+        language: 'json',
+      },
+    });
 
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
@@ -60,27 +88,9 @@ export async function syncToNotion(
       children,
     });
 
-    let uploadedUrl = null;
-    
-    // Upload image to the created page if buffer is provided
-    if (archiveBuffer) {
-      try {
-        await uploadToNotion(notion, {
-          pageId: response.id,
-          fileBuffer: archiveBuffer,
-          fileName: `${profileId}_${Date.now()}.webp`,
-          mimeType: 'image/webp',
-        });
-        // We consider the page URL as the image link for the spreadsheet since the image is inside it
-        uploadedUrl = ('url' in response) ? response.url : null;
-      } catch (uploadError) {
-        console.error('Failed to upload image to Notion page:', uploadError);
-      }
-    }
-
     return { 
       success: true, 
-      url: uploadedUrl || (('url' in response) ? response.url : null) 
+      url: ('url' in response) ? response.url : null 
     };
   } catch (error) {
     console.error("Notion sync error:", error);

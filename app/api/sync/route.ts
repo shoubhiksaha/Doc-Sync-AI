@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Successfully synced to all destinations',
       syncDetails,
-      imageUrl: imageUrl || null,
+      imageUrl: finalLinkToImage || null,
     });
 
   } catch (error: unknown) {

@@ -132,14 +132,14 @@ export default function ScanPage() {
 
         // Check conditions for auto-sync: all template fields found AND all have >= 95 confidence
         const allFound = missing.length === 0;
-        const allHighConfidence = matched.every(f => f.confidence >= 95);
+        const allHighConfidence = matched.every((f: ExtractedField) => f.confidence >= 95);
 
         if (allFound && allHighConfidence) {
           setAuditLogs(prev => [...prev, { stage: 'Template', status: 'success', message: `Template matched perfectly (${matched.length} fields) with high confidence. Auto-syncing...` }]);
           // Give React a tick to update the UI, then trigger sync
           setTimeout(() => onSyncClick(finalFields), 500);
         } else {
-          setAuditLogs(prev => [...prev, { stage: 'Template', status: 'warning', message: `Template applied but requires review. ${missing.length} missing, ${matched.filter(f => f.confidence < 95).length} low confidence.` }]);
+          setAuditLogs(prev => [...prev, { stage: 'Template', status: 'warning', message: `Template applied but requires review. ${missing.length} missing, ${matched.filter((f: ExtractedField) => f.confidence < 95).length} low confidence.` }]);
           toast('Please review the extracted data before syncing', { icon: '⚠️' });
         }
       } else {

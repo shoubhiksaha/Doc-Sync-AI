@@ -36,32 +36,53 @@ export default function Home() {
             </div>
           </Link>
 
-          <Link href="/scan/factory-weight-slip" style={{ textDecoration: 'none' }}>
-            <div className="profile-card" style={cardStyle(true)}>
+          {/* Greyed Out / Coming Soon Profiles */}
+          {[
+            {
+              title: 'Factory Scrap Weight-Slips',
+              desc: 'Extract vehicle no, gross weight, tare weight, and timestamp from kachha bills.'
+            },
+            {
+              title: 'Fleet Fuel & Petty Cash',
+              desc: 'Parse logistics fuel slips, toll receipts, and driver petty cash notes.'
+            },
+            {
+              title: 'Construction Material Inward',
+              desc: 'Digitize sand/cement inward challans for site inventory reconciliation.'
+            },
+            { title: 'Kirana Store Khatas', desc: 'Convert handwritten credit ledgers into structured customer balance sheets.' },
+            { title: 'Mandi Auction Slips', desc: 'Extract crop type, farmer name, weight, and bid price from APMC mandi slips.' },
+            { title: 'Transport Lorry Receipts (LR)', desc: 'Digitize consignor, consignee, e-way bill number, and freight amounts.' },
+            { title: 'Dairy Collection Slips', desc: 'Parse milk weight, fat percentage, SNF, and rate per liter from local dairy chits.' },
+            { title: 'Handloom Weaver Logs', desc: 'Digitize yarn consumed, meters woven, and piece-rate wage calculations.' },
+            { title: 'Brick Kiln Token Slips', desc: 'Count bricks molded, baked, and dispatched using daily worker tokens.' },
+            { title: 'Medical Store Prescriptions', desc: 'Convert handwritten doctor notes to structured medicine order lists.' },
+            { title: 'Jewelry Making (K कारीगरी) Logs', desc: 'Track raw gold issued, wastage, and finished ornament weight.' },
+            { title: 'Tailoring Measurement Books', desc: 'Digitize customer measurements and fabric details for boutique management.' },
+            { title: 'Caterer Raw Material Bills', desc: 'Parse sabzi mandi and wholesale grocery handwritten invoices.' },
+            { title: 'Daily Wage Muster Rolls', desc: 'Extract worker attendance, half-days, and daily payouts from register photos.' },
+            { title: 'Scrap Dealer (Kabadiwala) Rates', desc: 'Parse daily rate cards and collection weight receipts by material type.' },
+            { title: 'Garage Repair Estimates', desc: 'Digitize handwritten mechanic quotes for spare parts and labor.' },
+            { title: 'Agriculture Pesticide Bills', desc: 'Track fertilizers, seed varieties, and agrochemical purchases for farm accounting.' },
+            { title: 'Fish Market Auction Chits', desc: 'Parse boat name, catch type, weight, and wholesale bid amounts.' },
+            { title: 'Event Decorator Challans', desc: 'Track chairs, tents, and lighting equipment rented out and returned.' },
+            { title: 'Cable TV / WiFi Collection Receipts', desc: 'Digitize monthly subscription payments collected door-to-door.' },
+            { title: 'Ration Shop (PDS) Distribution Logs', desc: 'Parse family ration card numbers and grain quantities disbursed.' },
+            { title: 'Handicraft Artisan Piece-rate Cards', desc: 'Digitize items produced, quality checks, and payment due.' },
+            { title: 'Local Courier Delivery Run-sheets', desc: 'Extract tracking numbers, receiver signatures, and COD collected.' },
+            { title: 'Godown Storage Receipts', desc: 'Parse farmer name, commodity, bag count, and storage duration.' },
+            { title: 'Timber Mart Measurement Slips', desc: 'Digitize wood type, logs count, length, girth, and cubic feet volume.' },
+            { title: 'Mobile Repair Job Cards', desc: 'Extract customer issue, IMEI, spare part used, and total repair cost.' },
+            { title: 'Street Vendor Daily Finance', desc: 'Digitize micro-loan collections (daily bishi/chit fund payments).' }
+          ].map((profile, i) => (
+            <div key={i} className="profile-card" style={cardStyle(false)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}>Factory Scrap Weight-Slips</h3>
-                <span style={badgeStyle('var(--success)')}>Active</span>
+                <h3 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}>{profile.title}</h3>
+                <span style={badgeStyle('var(--warning)')}>Coming Soon</span>
               </div>
-              <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>Extract vehicle no, gross weight, tare weight, and timestamp from kachha bills.</p>
+              <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>{profile.desc}</p>
             </div>
-          </Link>
-
-          {/* Coming Soon Profiles */}
-          <div className="profile-card" style={cardStyle(false)}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}>Fleet Fuel & Petty Cash</h3>
-              <span style={badgeStyle('var(--warning)')}>Coming Soon</span>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>Parse logistics fuel slips, toll receipts, and driver petty cash notes.</p>
-          </div>
-
-          <div className="profile-card" style={cardStyle(false)}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', margin: 0 }}>Construction Material Inward</h3>
-              <span style={badgeStyle('var(--warning)')}>Coming Soon</span>
-            </div>
-            <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>Digitize sand/cement inward challans for site inventory reconciliation.</p>
-          </div>
+          ))}
 
         </div>
       </div>

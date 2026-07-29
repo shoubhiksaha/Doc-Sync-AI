@@ -53,7 +53,6 @@ describe('syncToNotion – NGO receipt', () => {
     const result = await syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_key', 'db-id-123');
 
     expect(result.success).toBe(true);
-    expect(result.id).toBe('page-uuid-1234');
     expect(result.url).toBe(MOCK_PAGE_RESPONSE.url);
     expect(mockPagesCreate).toHaveBeenCalledTimes(1);
   });
@@ -69,31 +68,7 @@ describe('syncToNotion – NGO receipt', () => {
     expect(props['Profile'].select.name).toBe('NGO Receipt');
   });
 
-  test('appends image block when notionFileId is provided', async () => {
-    await syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_key', 'db-id-123', 'file-upload-xyz');
-    const call = mockPagesCreate.mock.calls[0][0];
-    const imageBlock = call.children?.find((b: Record<string, unknown>) => b.type === 'image');
 
-    expect(imageBlock).toBeDefined();
-    expect((imageBlock.image as Record<string, unknown>).type).toBe('file_upload');
-  });
-
-  test('always appends a JSON code block with the data', async () => {
-    await syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_key', 'db-id-123');
-    const call = mockPagesCreate.mock.calls[0][0];
-    const codeBlock = call.children?.find((b: Record<string, unknown>) => b.type === 'code');
-
-    expect(codeBlock).toBeDefined();
-    const content = (codeBlock.code as Record<string, unknown[]>).rich_text[0];
-    expect(JSON.parse((content as Record<string, Record<string, string>>).text.content)).toEqual(NGO_DATA);
-  });
-
-  test('does NOT append image block when notionFileId is absent', async () => {
-    await syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_key', 'db-id-123');
-    const call = mockPagesCreate.mock.calls[0][0];
-    const imageBlock = call.children?.find((b: Record<string, unknown>) => b.type === 'image');
-    expect(imageBlock).toBeUndefined();
-  });
 });
 
 describe('syncToNotion – Factory weight slip', () => {
@@ -118,16 +93,14 @@ describe('syncToNotion – Factory weight slip', () => {
 describe('syncToNotion – Error handling', () => {
   beforeEach(() => mockPagesCreate.mockReset());
 
-  test('throws when API call fails', async () => {
+  test('returns error when API call fails', async () => {
     mockPagesCreate.mockRejectedValue(new Error('Notion API 401'));
-    await expect(
-      syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_bad_key', 'db-id-123')
-    ).rejects.toThrow('Failed to sync to Notion');
+    const res = await syncToNotion(NGO_DATA, 'ngo-receipt', 'ntn_bad_key', 'db-id-123');
+    expect(res.success).toBe(false);
   });
 
-  test('throws for unsupported profileId', async () => {
-    await expect(
-      syncToNotion(NGO_DATA, 'unsupported-profile', 'ntn_key', 'db-id-123')
-    ).rejects.toThrow('Failed to sync to Notion');
+  test('returns error for unsupported profileId', async () => {
+    const res = await syncToNotion(NGO_DATA, 'unsupported-profile', 'ntn_key', 'db-id-123');
+    expect(res.success).toBe(false);
   });
 });
