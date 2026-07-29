@@ -1,4 +1,5 @@
 import { Client } from '@notionhq/client';
+import { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints';
 import { uploadToNotion } from 'notion-multipart-uploader';
 import { NgoReceiptData, FactoryWeightSlipData } from "./schemas";
 
@@ -42,7 +43,7 @@ export async function syncToNotion(
     }
 
     // Add confirmed text from the review
-    const children = [
+    const children: BlockObjectRequest[] = [
       {
         object: 'block',
         type: 'code',
@@ -56,7 +57,7 @@ export async function syncToNotion(
     const response = await notion.pages.create({
       parent: { database_id: databaseId },
       properties,
-      children: children as any,
+      children,
     });
 
     let uploadedUrl = null;

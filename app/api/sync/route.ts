@@ -17,15 +17,13 @@ export async function POST(req: NextRequest) {
     const data = dataString ? JSON.parse(dataString) : null;
     const profileId = formData.get('profileId') as string;
     const clientSheetId = formData.get('spreadsheetId') as string | null;
-    const imageUrl = formData.get('imageUrl') as string | null;
-    const notionFileId = formData.get('notionFileId') as string | null;
     const documentFile = formData.get('document') as File | null;
 
     if (!data || !profileId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log(`Syncing data for ${profileId}... imageUrl: ${imageUrl || 'none'}, document attached: ${!!documentFile}`);
+    console.log(`Syncing data for ${profileId}... document attached: ${!!documentFile}`);
 
     const { notionKey: loadedNotionKey, notionDbId: loadedNotionDbId } = await loadSettings(req);
     const notionKey = req.headers.get('x-notion-key') || loadedNotionKey;
@@ -62,13 +60,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine the final link to store in Sheets
-    // Priority: GDrive link > Notion Page URL > GDrive Uploaded Link > placeholder
-    let finalLinkToImage = imageUrl;
-    if (!finalLinkToImage && notionResult.url) {
+    // Priority: Notion Page URL > GDrive Uploaded Link > placeholder
+    let finalLinkToImage: string | null = null;
+    if (notionResult.url) {
       finalLinkToImage = notionResult.url;
-    } else if (!finalLinkToImage && gdriveUrl) {
+    } else if (gdriveUrl) {
       finalLinkToImage = gdriveUrl;
-    } else if (!finalLinkToImage) {
+    } else {
       finalLinkToImage = '—';
     }
 

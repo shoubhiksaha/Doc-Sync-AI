@@ -65,8 +65,7 @@ export default function ScanPage() {
   const [suggestedFields, setSuggestedFields] = useState<SuggestedField[]>([]);
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [notionFileId, setNotionFileId] = useState<string | null>(null);
+
   const [pendingSyncFields, setPendingSyncFields] = useState<ExtractedField[] | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -188,8 +187,6 @@ export default function ScanPage() {
       formData.append('profileId', profileId);
       if (sheetId) formData.append('spreadsheetId', sheetId);
       if (cols) formData.append('columns', JSON.stringify(cols));
-      if (imageUrl) formData.append('imageUrl', imageUrl);
-      if (notionFileId) formData.append('notionFileId', notionFileId);
       if (selectedFile) formData.append('document', selectedFile);
 
       const res = await fetch('/api/sync', {

@@ -124,9 +124,11 @@ export async function POST(req: NextRequest) {
       message: `Sheet "${sheetTitle}" created with ${headers.length} columns.`,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sheet creation error:', error);
-    const errorMessage = error?.response?.data?.error?.message || error.message || 'Unknown error';
+    const errorMessage = error instanceof Error 
+      ? (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || error.message 
+      : 'Unknown error';
     return NextResponse.json({ 
       error: `Failed to create Google Sheet. Google says: ${errorMessage}` 
     }, { status: 500 });

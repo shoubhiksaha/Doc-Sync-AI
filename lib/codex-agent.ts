@@ -86,7 +86,7 @@ export async function runCodexPipeline(
     });
     extractedData = response.choices[0].message.parsed;
     auditLogs.push({ stage: 'Extraction', status: 'success', message: 'Stage 1 completed successfully.' });
-  } catch (e: any) {
+  } catch {
     auditLogs.push({ stage: 'Extraction', status: 'error', message: 'Stage 1 failed. Triggering Self-Healing fallback.' });
     extractedData = null;
   }
@@ -112,9 +112,9 @@ export async function runCodexPipeline(
       });
       extractedData = escalatedResponse.choices[0].message.parsed;
       auditLogs.push({ stage: 'Self-Healing', status: 'success', message: 'Stage 2 recovered data successfully.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       auditLogs.push({ stage: 'Self-Healing', status: 'error', message: 'Stage 2 failed to recover data.' });
-      const msg = err?.message || String(err);
+      const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('401')) {
         throw new Error(`Invalid API Key. Please check your OpenAI/GitHub token in Settings.`);
       }

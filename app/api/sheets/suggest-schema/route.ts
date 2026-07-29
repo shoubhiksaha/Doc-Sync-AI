@@ -12,20 +12,6 @@ export type SuggestedField = {
 };
 
 
-import { zodResponseFormat } from 'openai/helpers/zod';
-import { z } from 'zod';
-
-const SuggestedFieldSchema = z.object({
-  fields: z.array(z.object({
-    key: z.string(),
-    label: z.string(),
-    example: z.string(),
-    confidence: z.number(),
-    reason: z.string(),
-    required: z.boolean(),
-  }))
-});
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -83,27 +69,27 @@ Return ONLY a JSON object with a single key "fields", which contains an array of
     });
 
     const raw = response.choices[0].message.content || '{}';
-    let parsedData: any = {};
+    let parsedData: Record<string, unknown> = {};
     
     try {
       // Sometimes LLMs return markdown blocks even with json_object
       const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedData = JSON.parse(cleanJson);
-    } catch (e) {
+    } catch {
       console.warn("Failed to parse suggest-schema json:", raw);
     }
 
     // Robust extraction of the array
-    let fieldsArray: any[] = [];
+    let fieldsArray: SuggestedField[] = [];
     if (Array.isArray(parsedData)) {
       fieldsArray = parsedData;
     } else if (parsedData && Array.isArray(parsedData.fields)) {
-      fieldsArray = parsedData.fields;
+      fieldsArray = parsedData.fields as SuggestedField[];
     } else if (parsedData && Array.isArray(parsedData.columns)) {
-      fieldsArray = parsedData.columns;
+      fieldsArray = parsedData.columns as SuggestedField[];
     } else if (parsedData && typeof parsedData === 'object') {
       const firstVal = Object.values(parsedData)[0];
-      if (Array.isArray(firstVal)) fieldsArray = firstVal;
+      if (Array.isArray(firstVal)) fieldsArray = firstVal as SuggestedField[];
     }
 
     if (!fieldsArray || fieldsArray.length === 0) {
