@@ -69,8 +69,7 @@ export async function runCodexPipeline(
   auditLogs.push({ stage: 'Extraction', status: 'success', message: 'Initiated Stage 1: gpt-4o-mini fast extraction' });
   let extractedData;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (openai.beta as any).chat.completions.parse({
+    const response = await openai.chat.completions.parse({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: `You are an expert document extraction AI. ${contextPrompt}` },
@@ -96,8 +95,7 @@ export async function runCodexPipeline(
   if (!extractedData) {
     auditLogs.push({ stage: 'Self-Healing', status: 'warning', message: 'Escalating to gpt-4o for complex document parsing.' });
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const escalatedResponse = await (openai.beta as any).chat.completions.parse({
+      const escalatedResponse = await openai.chat.completions.parse({
         model: "gpt-4o",
         messages: [
           { role: "system", content: `${contextPrompt} Be extremely precise, this is a fallback for difficult handwriting. Pay close attention to smudged text.` },
@@ -114,9 +112,13 @@ export async function runCodexPipeline(
       });
       extractedData = escalatedResponse.choices[0].message.parsed;
       auditLogs.push({ stage: 'Self-Healing', status: 'success', message: 'Stage 2 recovered data successfully.' });
-    } catch {
+    } catch (err: unknown) {
       auditLogs.push({ stage: 'Self-Healing', status: 'error', message: 'Stage 2 failed to recover data.' });
-      throw new Error("Codex Pipeline failed to extract document data.");
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('401')) {
+        throw new Error(`Invalid API Key. Please check your OpenAI/GitHub token in Settings.`);
+      }
+      throw new Error(`Codex Pipeline failed to extract document data. Inner error: ${msg}`);
     }
   }
 

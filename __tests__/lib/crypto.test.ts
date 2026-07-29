@@ -21,17 +21,23 @@ describe('crypto – encrypt/decrypt', () => {
   });
 
   test('decrypt returns null for tampered ciphertext', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const cipher = encrypt('hello');
     const tampered = cipher.slice(0, -4) + 'XXXX';
     expect(decrypt(tampered)).toBeNull();
+    consoleSpy.mockRestore();
   });
 
   test('decrypt returns null for empty string', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(decrypt('')).toBeNull();
+    consoleSpy.mockRestore();
   });
 
   test('decrypt returns null for random garbage', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(decrypt('not-base64!!!')).toBeNull();
+    consoleSpy.mockRestore();
   });
 
   test('encrypts special characters and unicode correctly', () => {
@@ -68,8 +74,10 @@ describe('crypto – getDecryptedCookie', () => {
   });
 
   test('returns undefined when cookie value is corrupted', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const req = makeRequest({ docsync_openai: 'corrupted-garbage' });
     expect(getDecryptedCookie(req, 'docsync_openai')).toBeUndefined();
+    consoleSpy.mockRestore();
   });
 
   test('returns correct cookie among multiple cookies', () => {

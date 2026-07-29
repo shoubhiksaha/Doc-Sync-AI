@@ -3,33 +3,48 @@ import { syncToNotion } from '@/lib/notion';
 import { loadSettings } from '@/lib/settings-loader';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
+import { uploadToGDrive } from '@/lib/gdrive';
+import sharp from 'sharp';
 
 export async function POST(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'mock_secret' });
     const accessToken = token?.accessToken as string | undefined;
 
-    const body = await req.json();
-    const {
-      data,
-      profileId,
-      spreadsheetId: clientSheetId,
-      imageUrl,       // GDrive public link (or notion:// fallback)
-      notionFileId,   // Notion file_upload ID for embedding image in Notion page
-    } = body;
+    const formData = await req.formData();
+    
+    const dataString = formData.get('data') as string;
+    const data = dataString ? JSON.parse(dataString) : null;
+    const profileId = formData.get('profileId') as string;
+    const clientSheetId = formData.get('spreadsheetId') as string | null;
+    const documentFile = formData.get('document') as File | null;
 
     if (!data || !profileId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log(`Syncing data for ${profileId}... imageUrl: ${imageUrl || 'none'}`);
+    console.log(`Syncing data for ${profileId}... document attached: ${!!documentFile}`);
 
     const { notionKey: loadedNotionKey, notionDbId: loadedNotionDbId } = await loadSettings(req);
     const notionKey = req.headers.get('x-notion-key') || loadedNotionKey;
     const notionDbId = req.headers.get('x-notion-db-id') || loadedNotionDbId;
 
+    let archiveBuffer = null;
+    if (documentFile) {
+      try {
+        const arrayBuffer = await documentFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        archiveBuffer = await sharp(buffer)
+          .resize({ width: 1500, height: 1500, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 68 })
+          .toBuffer();
+      } catch (err) {
+        console.error('Failed to compress image for Notion archive:', err);
+      }
+    }
+
     // --- Notion Sync (Run first so we can grab the URL for Sheets if needed) ---
-    const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, notionFileId);
+    const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, archiveBuffer);
     let notionResult;
     try {
       notionResult = await notionPromise;
@@ -37,12 +52,21 @@ export async function POST(req: NextRequest) {
       notionResult = { success: false, dummy: false, url: null };
     }
 
+    let gdriveUrl: string | null = null;
+    if (archiveBuffer && accessToken && (!notionResult.success || 'dummy' in notionResult)) {
+      // If Notion is not configured or failed, upload to Google Drive instead
+      const fileName = `${profileId}_${Date.now()}.webp`;
+      gdriveUrl = await uploadToGDrive(accessToken, archiveBuffer, fileName);
+    }
+
     // Determine the final link to store in Sheets
-    // Priority: GDrive link > Notion Page URL > placeholder
-    let finalLinkToImage = imageUrl;
-    if (!finalLinkToImage && notionResult.url) {
+    // Priority: Notion Page URL > GDrive Uploaded Link > placeholder
+    let finalLinkToImage: string | null = null;
+    if (notionResult.url) {
       finalLinkToImage = notionResult.url;
-    } else if (!finalLinkToImage) {
+    } else if (gdriveUrl) {
+      finalLinkToImage = gdriveUrl;
+    } else {
       finalLinkToImage = '—';
     }
 
@@ -130,7 +154,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Successfully synced to all destinations',
       syncDetails,
-      imageUrl: imageUrl || null,
+      imageUrl: finalLinkToImage || null,
     });
 
   } catch (error: unknown) {

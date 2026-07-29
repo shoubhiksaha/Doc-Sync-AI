@@ -105,6 +105,8 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('Error processing document:', error);
-    return NextResponse.json({ error: 'An internal error occurred during document processing.' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    return NextResponse.json({ error: `An internal error occurred during document processing: ${errorMessage}`, stack: errorStack }, { status: 500 });
   }
 }

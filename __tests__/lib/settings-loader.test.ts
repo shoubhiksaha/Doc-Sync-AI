@@ -138,4 +138,85 @@ describe('loadSettings', () => {
     
     consoleSpy.mockRestore();
   });
+
+  it('should skip firestore lookup if token has no email', async () => {
+    (cryptoHelper.getDecryptedCookie as jest.Mock).mockReturnValue(undefined);
+    
+    const mockReq = {
+      cookies: {
+        get: jest.fn().mockReturnValue(undefined),
+      },
+    } as unknown as NextRequest;
+
+    (getToken as jest.Mock).mockResolvedValue({}); // No email
+
+    const settings = await loadSettings(mockReq);
+
+    expect(mockGet).not.toHaveBeenCalled();
+    expect(settings.openaiKey).toBeUndefined();
+  });
+
+  it('should only update keys that exist in firestore', async () => {
+    (cryptoHelper.getDecryptedCookie as jest.Mock).mockReturnValue(undefined);
+    
+    const mockReq = {
+      cookies: {
+        get: jest.fn().mockReturnValue(undefined),
+      },
+    } as unknown as NextRequest;
+
+    (getToken as jest.Mock).mockResolvedValue({ email: 'test@example.com' });
+
+    mockGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        openaiKey: { wrappedDEK: '...', ciphertext: '...', iv: '...', authTag: '...' },
+        // notionKey and notionDbId and uploadDest missing
+      }),
+    });
+
+    (securityHelper.unwrapAndDecryptDEK as jest.Mock).mockImplementation((payload) => 'unwrapped-openai');
+
+    const settings = await loadSettings(mockReq);
+
+    expect(settings.openaiKey).toBe('unwrapped-openai');
+    expect(settings.notionKey).toBeUndefined();
+    expect(settings.notionDbId).toBeUndefined();
+    expect(settings.uploadDest).toBe('both');
+  });
+
+  it('should handle doc existing but data being undefined', async () => {
+    (cryptoHelper.getDecryptedCookie as jest.Mock).mockReturnValue(undefined);
+    
+    const mockReq = { cookies: { get: jest.fn().mockReturnValue(undefined) } } as unknown as NextRequest;
+    (getToken as jest.Mock).mockResolvedValue({ email: 'test@example.com' });
+
+    mockGet.mockResolvedValue({
+      exists: true,
+      data: () => undefined,
+    });
+
+    const settings = await loadSettings(mockReq);
+    expect(settings.openaiKey).toBeUndefined();
+  });
+
+  it('should handle data missing openaiKey', async () => {
+    (cryptoHelper.getDecryptedCookie as jest.Mock).mockReturnValue(undefined);
+    
+    const mockReq = { cookies: { get: jest.fn().mockReturnValue(undefined) } } as unknown as NextRequest;
+    (getToken as jest.Mock).mockResolvedValue({ email: 'test@example.com' });
+
+    mockGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        notionKey: { wrappedDEK: '...', ciphertext: '...', iv: '...', authTag: '...' }
+      }),
+    });
+
+    (securityHelper.unwrapAndDecryptDEK as jest.Mock).mockImplementation(() => 'unwrapped-notion');
+
+    const settings = await loadSettings(mockReq);
+    expect(settings.openaiKey).toBeUndefined();
+    expect(settings.notionKey).toBe('unwrapped-notion');
+  });
 });

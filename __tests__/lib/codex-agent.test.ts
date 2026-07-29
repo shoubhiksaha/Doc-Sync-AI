@@ -3,11 +3,9 @@ const mockParse = jest.fn();
 jest.mock('openai', () => {
   return {
     OpenAI: jest.fn().mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: mockParse,
-          },
+      chat: {
+        completions: {
+          parse: mockParse,
         },
       },
     })),

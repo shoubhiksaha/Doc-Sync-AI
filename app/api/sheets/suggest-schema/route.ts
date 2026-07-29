@@ -45,20 +45,21 @@ Your task:
 1. Propose the IDEAL set of column headers for a Google Sheet that will store data from many such documents.
 2. For each field that is DIRECTLY extracted from the document, give it a high confidence (80-100).
 3. If a field is DERIVED (e.g., "Net Weight" = Gross - Tare) or you're UNSURE about its format/name, give it lower confidence (40-70) and flag it for user review.
-4. Add a "Timestamp" column for when the row was synced (confidence 100).
-5. Always include a "Sync Status" column (confidence 100).
+4. Only include fields that correspond to the provided extracted data or standard derived fields. Do not add arbitrary metadata like Timestamp or Sync Status unless explicitly present in the data.
 
-Return ONLY a valid JSON array (no markdown, no explanation) in exactly this format:
-[
-  {
-    "key": "snake_case_key",
-    "label": "Human Readable Label",
-    "example": "value from extracted data or example",
-    "confidence": 95,
-    "reason": "Directly extracted from document",
-    "required": true
-  }
-]`;
+Return ONLY a JSON object with a single key "fields", which contains an array of your proposed columns. Exactly like this:
+{
+  "fields": [
+    {
+      "key": "snake_case_key",
+      "label": "Human Readable Label",
+      "example": "example value",
+      "confidence": 95,
+      "reason": "Directly extracted from document",
+      "required": true
+    }
+  ]
+}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -68,12 +69,34 @@ Return ONLY a valid JSON array (no markdown, no explanation) in exactly this for
     });
 
     const raw = response.choices[0].message.content || '{}';
-    // The model returns a JSON object — unwrap the array
-    const parsed = JSON.parse(raw);
-    // Handle both {fields:[...]} and [...] responses
-    const fields: SuggestedField[] = Array.isArray(parsed) ? parsed : (parsed.fields || parsed.columns || Object.values(parsed)[0] as SuggestedField[]);
+    let parsedData: Record<string, unknown> = {};
+    
+    try {
+      // Sometimes LLMs return markdown blocks even with json_object
+      const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsedData = JSON.parse(cleanJson);
+    } catch {
+      console.warn("Failed to parse suggest-schema json:", raw);
+    }
 
-    return NextResponse.json({ fields });
+    // Robust extraction of the array
+    let fieldsArray: SuggestedField[] = [];
+    if (Array.isArray(parsedData)) {
+      fieldsArray = parsedData;
+    } else if (parsedData && Array.isArray(parsedData.fields)) {
+      fieldsArray = parsedData.fields as SuggestedField[];
+    } else if (parsedData && Array.isArray(parsedData.columns)) {
+      fieldsArray = parsedData.columns as SuggestedField[];
+    } else if (parsedData && typeof parsedData === 'object') {
+      const firstVal = Object.values(parsedData)[0];
+      if (Array.isArray(firstVal)) fieldsArray = firstVal as SuggestedField[];
+    }
+
+    if (!fieldsArray || fieldsArray.length === 0) {
+       return NextResponse.json({ fields: getStaticDefaults(profileId, extractedData) });
+    }
+
+    return NextResponse.json({ fields: fieldsArray });
 
   } catch (error) {
     console.error('Schema suggestion error:', error);
@@ -88,9 +111,6 @@ function getStaticDefaults(profileId: string, extractedData: Record<string, unkn
       { key: 'donor_name', label: 'Donor Name', example: String(extractedData.donorName || ''), confidence: 95, reason: 'Directly extracted', required: true },
       { key: 'amount', label: 'Amount (₹)', example: String(extractedData.amount || ''), confidence: 95, reason: 'Directly extracted', required: true },
       { key: 'pan_number', label: 'PAN Number', example: String(extractedData.panNumber || ''), confidence: 80, reason: 'May be absent on small receipts', required: false },
-      { key: 'link_to_image', label: 'Link to Image', example: 'https://drive.google.com/file/d/...', confidence: 100, reason: 'Auto-uploaded archive WebP (Google Drive or Notion)', required: true },
-      { key: 'synced_at', label: 'Synced At', example: new Date().toISOString(), confidence: 100, reason: 'Auto-generated timestamp', required: true },
-      { key: 'sync_status', label: 'Sync Status', example: 'Success', confidence: 100, reason: 'Auto-generated status', required: true },
     ];
   }
   return [
@@ -99,9 +119,6 @@ function getStaticDefaults(profileId: string, extractedData: Record<string, unkn
     { key: 'gross_weight', label: 'Gross Weight (kg)', example: String(extractedData.grossWeight || ''), confidence: 95, reason: 'Directly extracted', required: true },
     { key: 'tare_weight', label: 'Tare Weight (kg)', example: String(extractedData.tareWeight || ''), confidence: 95, reason: 'Directly extracted', required: true },
     { key: 'net_weight', label: 'Net Weight (kg)', example: String((Number(extractedData.grossWeight || 0) - Number(extractedData.tareWeight || 0)) || ''), confidence: 60, reason: 'Derived: Gross - Tare. Verify formula is correct.', required: false },
-    { key: 'link_to_image', label: 'Link to Image', example: 'https://drive.google.com/file/d/...', confidence: 100, reason: 'Auto-uploaded archive WebP (Google Drive or Notion)', required: true },
-    { key: 'synced_at', label: 'Synced At', example: new Date().toISOString(), confidence: 100, reason: 'Auto-generated timestamp', required: true },
-    { key: 'sync_status', label: 'Sync Status', example: 'Success', confidence: 100, reason: 'Auto-generated status', required: true },
   ];
 }
 

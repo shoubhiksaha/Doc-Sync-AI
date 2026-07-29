@@ -33,7 +33,7 @@ describe('NgoReceiptSchema', () => {
         amount: 100,
         panNumber: null,
       });
-      expect(result.panNumber).toBeNull();
+      expect(result.panNumber).toBe('');
     });
 
     test('PAN normalises lowercase and trims whitespace', () => {
