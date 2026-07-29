@@ -74,7 +74,7 @@ describe('syncToNotion – NGO receipt', () => {
   });
 
   test('uses fallback values when NGO data is 0 or missing', async () => {
-    const zeroData = { ...NGO_DATA, amount: 0, panNumber: null };
+    const zeroData = { ...NGO_DATA, amount: 0, panNumber: null as unknown as string };
     await syncToNotion(zeroData, 'ngo-receipt', 'ntn_key', 'db-id-123');
     const call = mockPagesCreate.mock.calls[0][0];
     const props = call.properties;
