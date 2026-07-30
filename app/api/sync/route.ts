@@ -128,11 +128,12 @@ export async function POST(req: NextRequest) {
           if (key === 'sync_status') return 'Success';
           if (key === 'link_to_image') return finalLinkToImage;
           if (key === 'net_weight') {
-            const fw = data as any;
-            return (fw.grossWeight ?? 0) - (fw.tareWeight ?? 0);
+            const fw = data as Record<string, unknown>;
+            return (Number(fw.grossWeight) ?? 0) - (Number(fw.tareWeight) ?? 0);
           }
           const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-          return (data as any)[camelKey] ?? (data as any)[key] ?? '';
+          const dataRec = data as Record<string, unknown>;
+          return dataRec[camelKey] ?? dataRec[key] ?? '';
         });
       } else {
         const baseRow = profileId === 'ngo-receipt'
@@ -148,8 +149,9 @@ export async function POST(req: NextRequest) {
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [rowValues] },
         });
-      } catch (err: any) {
-        if (err?.message && err.message.includes('Unable to parse range')) {
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error?.message && error.message.includes('Unable to parse range')) {
           // Create the missing tab
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId: spreadsheetId as string,
