@@ -71,39 +71,69 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Google Sheets Sync ---
-    const spreadsheetId = clientSheetId || process.env.GOOGLE_SHEET_ID;
+    // The user might have provided an explicit sheet ID, but we want to auto-create and manage one 
+    // using drive.file scope if none works or none is provided.
+    const explicitSpreadsheetId = clientSheetId || process.env.GOOGLE_SHEET_ID;
 
     const sheetsPromise = (async () => {
-      if (!accessToken || !spreadsheetId) {
-        console.warn('Skipping Sheets sync: no access token or sheet ID.');
+      if (!accessToken) {
+        console.warn('Skipping Sheets sync: no access token.');
         return { success: true, mock: true };
+      }
+
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: accessToken });
+      
+      const drive = google.drive({ version: 'v3', auth });
+      const sheets = google.sheets({ version: 'v4', auth });
+
+      let spreadsheetId = explicitSpreadsheetId;
+      const sheetName = profileId === 'ngo-receipt' ? 'NGO_Receipts' : 'Factory_Slips';
+
+      // If no explicit ID, find or create "DocSync AI Data"
+      if (!spreadsheetId) {
+        try {
+          const res = await drive.files.list({
+            q: "name='DocSync AI Data' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+            spaces: 'drive',
+            fields: 'files(id, name)',
+          });
+          
+          if (res.data.files && res.data.files.length > 0) {
+            spreadsheetId = res.data.files[0].id as string;
+          } else {
+            // Create it
+            const createRes = await sheets.spreadsheets.create({
+              requestBody: {
+                properties: { title: 'DocSync AI Data' },
+                sheets: [{ properties: { title: sheetName } }]
+              }
+            });
+            spreadsheetId = createRes.data.spreadsheetId as string;
+          }
+        } catch (err) {
+          console.error("Error finding/creating DocSync AI Data spreadsheet:", err);
+          throw err; // Fail the sync
+        }
       }
 
       const schemaCookieName = `docsync_schema_${profileId.replace(/-/g, '_')}`;
       const schemaRaw = req.cookies.get(schemaCookieName)?.value;
       const schemaKeys: string[] | null = schemaRaw ? JSON.parse(schemaRaw) : null;
 
-      const auth = new google.auth.OAuth2();
-      auth.setCredentials({ access_token: accessToken });
-      const sheets = google.sheets({ version: 'v4', auth });
-
-      const sheetName = profileId === 'ngo-receipt' ? 'NGO_Receipts' : 'Factory_Slips';
-
       let rowValues: unknown[];
-
       if (schemaKeys) {
         rowValues = schemaKeys.map((key) => {
           if (key === 'synced_at') return new Date().toISOString();
           if (key === 'sync_status') return 'Success';
           if (key === 'link_to_image') return finalLinkToImage;
           if (key === 'net_weight') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const fw = data as any;
-            return (fw.grossWeight ?? 0) - (fw.tareWeight ?? 0);
+            const fw = data as Record<string, unknown>;
+            return (Number(fw.grossWeight) ?? 0) - (Number(fw.tareWeight) ?? 0);
           }
           const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return (data as any)[camelKey] ?? (data as any)[key] ?? '';
+          const dataRec = data as Record<string, unknown>;
+          return dataRec[camelKey] ?? dataRec[key] ?? '';
         });
       } else {
         const baseRow = profileId === 'ngo-receipt'
@@ -112,20 +142,43 @@ export async function POST(req: NextRequest) {
         rowValues = [...baseRow, finalLinkToImage, new Date().toISOString(), 'Success'];
       }
 
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: `${sheetName}!A:Z`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [rowValues] },
-      });
+      try {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: spreadsheetId as string,
+          range: `${sheetName}!A:Z`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [rowValues] },
+        });
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error?.message && error.message.includes('Unable to parse range')) {
+          // Create the missing tab
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: spreadsheetId as string,
+            requestBody: {
+              requests: [{ addSheet: { properties: { title: sheetName } } }]
+            }
+          });
+          // Retry append
+          await sheets.spreadsheets.values.append({
+            spreadsheetId: spreadsheetId as string,
+            range: `${sheetName}!A:Z`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [rowValues] },
+          });
+        } else {
+          throw err;
+        }
+      }
 
-      return { success: true };
+      return { success: true, spreadsheetId: spreadsheetId as string };
     })();
 
-    let sheetsResult;
+    let sheetsResult: { success: boolean; spreadsheetId?: string; mock?: boolean };
     try {
       sheetsResult = await sheetsPromise;
-    } catch {
+    } catch (e) {
+      console.error('Google Sheets append error:', e);
       sheetsResult = { success: false };
     }
 
@@ -143,7 +196,7 @@ export async function POST(req: NextRequest) {
       errors.push('Google Sheets Sync Failed');
       syncDetails.sheets = 'failed';
     } else {
-      syncDetails.sheets = spreadsheetId ? 'success' : 'skipped';
+      syncDetails.sheets = sheetsResult.spreadsheetId ? 'success' : 'skipped';
     }
 
     if (errors.length > 0) {
