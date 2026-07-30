@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
           });
           
           if (res.data.files && res.data.files.length > 0) {
-            spreadsheetId = res.data.files[0].id;
+            spreadsheetId = res.data.files[0].id as string;
           } else {
             // Create it
             const createRes = await sheets.spreadsheets.create({
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
                 sheets: [{ properties: { title: sheetName } }]
               }
             });
-            spreadsheetId = createRes.data.spreadsheetId;
+            spreadsheetId = createRes.data.spreadsheetId as string;
           }
         } catch (err) {
           console.error("Error finding/creating DocSync AI Data spreadsheet:", err);
@@ -171,10 +171,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return { success: true };
+      return { success: true, spreadsheetId: spreadsheetId as string };
     })();
 
-    let sheetsResult;
+    let sheetsResult: { success: boolean; spreadsheetId?: string; mock?: boolean };
     try {
       sheetsResult = await sheetsPromise;
     } catch (e) {
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
       errors.push('Google Sheets Sync Failed');
       syncDetails.sheets = 'failed';
     } else {
-      syncDetails.sheets = spreadsheetId ? 'success' : 'skipped';
+      syncDetails.sheets = sheetsResult.spreadsheetId ? 'success' : 'skipped';
     }
 
     if (errors.length > 0) {
