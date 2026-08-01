@@ -4,6 +4,7 @@ import { loadSettings } from '@/lib/settings-loader';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
 import { uploadToGDrive, ensureFolder, getGoogleAuth, makeFilePublic } from '@/lib/gdrive';
+import { transcribeAudio } from '@/lib/openai';
 import sharp from 'sharp';
 
 import { saveMediaLocallyForDemo } from '@/lib/demo-storage';
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     const data = dataString ? JSON.parse(dataString) : null;
     const profileId = formData.get('profileId') as string;
     const clientSheetId = formData.get('spreadsheetId') as string | null;
+    const duplicateAction = formData.get('duplicateAction') as string | null;
     const documentFile = formData.get('document') as File | null;
     const noteText = formData.get('noteText') as string | null;
     const audioFile = formData.get('audioFile') as File | null;
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
     const notionKey = req.headers.get('x-notion-key') || loadedNotionKey;
     const notionDbId = req.headers.get('x-notion-db-id') || loadedNotionDbId;
 
-    let archiveBuffer: Buffer | null = null;
+    let archiveBuffer = null;
     if (documentFile) {
       try {
         const arrayBuffer = await documentFile.arrayBuffer();
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const finalNoteText = noteText || '';
+    let finalNoteText = noteText || '';
     let audioBuffer: Buffer | null = null;
     
     if (audioFile) {
@@ -319,7 +321,7 @@ export async function POST(req: NextRequest) {
             };
           }
         } catch (err: unknown) {
-          if ((err as { isDuplicateConflict?: boolean })?.isDuplicateConflict) throw err;
+          if ((err as any)?.isDuplicateConflict) throw err;
           // Ignore other errors (e.g. "Unable to parse range" meaning tab doesn't exist yet)
         }
       }
@@ -414,7 +416,7 @@ export async function POST(req: NextRequest) {
     try {
       sheetsResult = await sheetsPromise;
     } catch (e: unknown) {
-      if ((e as { isDuplicateConflict?: boolean })?.isDuplicateConflict) {
+      if ((e as any)?.isDuplicateConflict) {
         return NextResponse.json(e, { status: 409 });
       }
       console.error('Google Sheets append error:', e);

@@ -30,7 +30,7 @@ export default function DuplicateAlert({ duplicateCount, primaryKeyLabel, primar
         
         {duplicateCount > 1 && (
           <div style={{ fontSize: '0.8rem', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', padding: '0.5rem', borderRadius: '4px', marginBottom: '1.5rem' }}>
-            Warning: Selecting &quot;Replace&quot; will overwrite all {duplicateCount} matching records.
+            Warning: Selecting "Replace" will overwrite all {duplicateCount} matching records.
           </div>
         )}
 

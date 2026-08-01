@@ -32,7 +32,7 @@ function SettingsContent() {
       if (data.uploadDest) setUploadDest(data.uploadDest);
       if (data.isPersistent) setPersistent(true);
     });
-  }, [searchParams]);
+  }, []);
 
   const handleSave = async () => {
     const payload = {

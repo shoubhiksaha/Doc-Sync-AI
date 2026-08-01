@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
 import { cookies } from 'next/headers';
-import { getGoogleAuth, ensureFolder } from '@/lib/gdrive';
+import { getGoogleAuth, makeFilePublic, ensureFolder } from '@/lib/gdrive';
 
 export type SheetColumn = {
   key: string;
@@ -71,10 +71,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // @ts-expect-error: googleapis auth typings
-    const sheets = google.sheets({ version: 'v4', auth });
-    // @ts-expect-error: googleapis auth typings
-    const drive = google.drive({ version: 'v3', auth });
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const drive = google.drive({ version: 'v3', auth: auth as any });
 
     currentStep = 'creating spreadsheet';
     let spreadsheetId = '';
@@ -261,6 +259,7 @@ export async function POST(req: NextRequest) {
     const errorMessage = error instanceof Error 
       ? (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || error.message 
       : 'Unknown error';
+    // @ts-ignore
     const step = currentStep || 'unknown';
     return NextResponse.json({ 
       error: `Failed during ${step}. Google says: ${errorMessage}` 
