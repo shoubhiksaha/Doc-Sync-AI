@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+export const maxDuration = 60;
 import { NextRequest, NextResponse } from 'next/server';
 import { syncToNotion } from '@/lib/notion';
 import { loadSettings } from '@/lib/settings-loader';
