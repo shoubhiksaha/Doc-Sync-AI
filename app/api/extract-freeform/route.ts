@@ -1,31 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
-import { OpenAI } from 'openai';
-import { z } from 'zod';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { UniversalAIAdapter } from '@/lib/UniversalAIAdapter';
+import { loadSettings } from '@/lib/settings-loader';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-// The free-form schema: AI returns whatever fields it finds
-const FreFormSchema = z.object({
-  fields: z.array(z.object({
-    key: z.string().describe('camelCase machine key, e.g. receiptNumber'),
-    label: z.string().describe('Human-readable label, e.g. Receipt Number'),
-    value: z.string().describe('The extracted value as a string'),
-    confidence: z.number().min(0).max(100).describe('0-100 confidence score'),
-    category: z.enum(['identity', 'financial', 'date', 'contact', 'metadata', 'other']),
-  })),
-  documentType: z.string().describe('Brief description of what document type this appears to be'),
-  totalFieldsVisible: z.number().describe('Total number of distinct fields/sections visible in the document'),
-});
-
-function createOpenAIClient(customApiKey?: string) {
-  const apiKey = customApiKey || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN;
-  const isGitHubToken = apiKey?.startsWith('ghp_') || apiKey?.startsWith('github_pat_');
-  return new OpenAI({
-    apiKey: apiKey || 'dummy_key',
-    ...(isGitHubToken && { baseURL: 'https://models.inference.ai.azure.com' }),
-  });
+function detectProviderAndModel(key: string) {
+  if (key.startsWith('gsk_')) {
+    return { provider: 'groq', modelName: 'llama-3.2-90b-vision-preview' };
+  } else if (key.startsWith('sk-') || key.startsWith('proj-')) {
+    return { provider: 'openai', modelName: 'gpt-4o' };
+  } else {
+    // Default to Gemini (starts with AIza... or AQ...)
+    return { provider: 'google', modelName: 'gemini-2.5-flash' };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -55,7 +43,9 @@ export async function POST(req: NextRequest) {
         .toBuffer();
     }
 
-    const apiKey = req.headers.get('x-openai-key') || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN;
+    const { openaiKey } = await loadSettings(req);
+    const customApiKey = req.headers.get('x-openai-key') || openaiKey;
+    const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
 
     // If no API key — return mock data
     if (!apiKey) {
@@ -77,7 +67,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const openai = createOpenAIClient(apiKey);
+    const { provider, modelName } = detectProviderAndModel(apiKey);
+    const adapter = new UniversalAIAdapter({
+      apiKey: apiKey,
+      provider: provider,
+      modelName: modelName,
+    });
+    
     const base64Image = imgBuffer.toString('base64');
 
     // Build the system prompt — if user has saved a template, focus on those fields
@@ -90,6 +86,20 @@ export async function POST(req: NextRequest) {
     }
 
     const systemPrompt = `You are an expert document analysis AI. Your job is to extract EVERY visible field from the document image.
+Your entire response MUST be valid JSON. DO NOT include markdown formatting like \`\`\`json. Return raw JSON matching this schema exactly:
+{
+  "fields": [
+    {
+      "key": "camelCase machine key, e.g. receiptNumber",
+      "label": "Human-readable label, e.g. Receipt Number",
+      "value": "The extracted value as a string",
+      "confidence": 0-100,
+      "category": "identity | financial | date | contact | metadata | other"
+    }
+  ],
+  "documentType": "Brief description of what document type this appears to be",
+  "totalFieldsVisible": 5
+}
 
 Be exhaustive — capture everything:
 - Dates, reference numbers, IDs
@@ -103,24 +113,13 @@ Be exhaustive — capture everything:
 For confidence: 95+ = clearly printed, 75-94 = slightly unclear, 50-74 = partially visible, <50 = inferred.
 Return every field you can possibly identify.${focusPrompt}`;
 
-    const response = await openai.chat.completions.parse({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: `Extract ALL fields from this ${profileId} document. Be exhaustive.` },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-          ],
-        },
-      ],
-      response_format: zodResponseFormat(FreFormSchema, 'extracted_document'),
-      temperature: 0,
-    });
+    const rawJsonString = await adapter.chat(
+      systemPrompt, 
+      `Extract ALL fields from this ${profileId} document. Be exhaustive.`, 
+      [{ mimeType: "image/jpeg", base64Data: base64Image }]
+    );
 
-    const parsed = response.choices[0].message.parsed;
-    if (!parsed) throw new Error('AI returned empty response');
+    const parsed = JSON.parse(rawJsonString);
 
     return NextResponse.json({
       success: true,
