@@ -1,5 +1,3 @@
-import { NextRequest } from 'next/server';
-
 /**
  * Handles media storage for Demo Mode ONLY.
  * Because the Demo Service Account has no Google Drive storage quota, 

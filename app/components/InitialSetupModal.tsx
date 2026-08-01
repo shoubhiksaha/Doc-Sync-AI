@@ -1,11 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function InitialSetupModal() {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
 
   const skipSetup = async () => {
