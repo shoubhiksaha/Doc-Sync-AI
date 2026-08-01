@@ -155,8 +155,9 @@ export default function ScanPage() {
           } else {
             toast.error(data.error || 'Transcription failed (Check OpenAI Key)');
           }
-        } catch {
-          toast.error('Network error during transcription');
+        } catch (err) {
+          console.error('Transcription fetch error:', err);
+          toast.error('Network error during transcription (Check console)');
         } finally {
           setIsTranscribing(false);
         }
@@ -257,8 +258,8 @@ export default function ScanPage() {
       }
 
     } catch (err) {
-      console.error(err);
-      toast.error('Network error during extraction');
+      console.error('Extraction fetch error:', err);
+      toast.error('Network error during extraction (Check console)');
     } finally {
       setIsProcessing(false);
     }
