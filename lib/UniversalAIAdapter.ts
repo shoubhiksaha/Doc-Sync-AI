@@ -171,7 +171,7 @@ export class UniversalAIAdapter {
             };
 
             if (systemPrompt) {
-                payload.systemInstruction = {
+                payload['systemInstruction'] = {
                     parts: [{ text: systemPrompt }]
                 };
             }
@@ -227,7 +227,7 @@ export class UniversalAIAdapter {
             temperature: 0.1
         };
 
-        if (systemPrompt) payload.system = systemPrompt;
+        if (systemPrompt) payload['system'] = systemPrompt;
 
         const response = await this._fetch(this.baseUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
         if (!response.ok) {

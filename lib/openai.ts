@@ -144,6 +144,11 @@ export async function transcribeAudio(audioBuffer: Buffer, fileName: string, cus
 
   const attemptPipeline: { run: (k: string) => Promise<string | null>, key: string, name: string }[] = [];
 
+  if (!customApiKey && !envGroq && !envGemini && !envOpenAI) {
+    console.warn("No API Keys set. Using mock transcription.");
+    return "This is a mock transcription because no API keys were provided. Please check your settings.";
+  }
+
   // Priority 1: BYOK (Any Provider)
   if (customApiKey) {
     if (customApiKey.startsWith('gsk_')) attemptPipeline.push({ run: runGroq, key: customApiKey, name: 'Groq (BYOK)' });
