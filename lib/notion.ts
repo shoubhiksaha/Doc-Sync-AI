@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Client } from '@notionhq/client';
 import { BlockObjectRequest, CreatePageParameters } from '@notionhq/client/build/src/api-endpoints';
 import { uploadToNotion } from 'notion-multipart-uploader';

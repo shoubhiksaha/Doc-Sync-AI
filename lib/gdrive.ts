@@ -1,4 +1,5 @@
-import { google, drive_v3, Auth } from 'googleapis';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
 
 export function getGoogleAuth(accessToken?: string): any {
