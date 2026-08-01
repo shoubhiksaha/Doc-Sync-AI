@@ -21,18 +21,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing extractedData or profileId' }, { status: 400 });
     }
 
-    const { openaiKey: loadedOpenaiKey } = await loadSettings(req);
-    const openaiKey = loadedOpenaiKey || req.headers.get('x-openai-key') || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN || undefined;
+    const { openaiKey } = await loadSettings(req);
+    const resolvedKey = req.headers.get('x-openai-key') || openaiKey;
 
-    // If no AI key, return smart static defaults based on profile
-    if (!openaiKey) {
+    const envGemini = process.env.GEMINI_API_KEY;
+    const envGroq = process.env.GROQ_API_KEY;
+    const envOpenAI = process.env.OPENAI_API_KEY;
+    const apiKey = resolvedKey || envGemini || envGroq || envOpenAI;
+
+    // If no API key is provided, we return mock data immediately
+    if (!apiKey || apiKey === 'dummy_key') {
       return NextResponse.json({ fields: getStaticDefaults(profileId, extractedData) });
     }
 
-    const isGitHubToken = openaiKey.startsWith('ghp_') || openaiKey.startsWith('github_pat_');
-    const openai = new OpenAI({
-      apiKey: openaiKey,
-      ...(isGitHubToken && { baseURL: 'https://models.inference.ai.azure.com' }),
+    const { UniversalAIAdapter } = await import('@/lib/UniversalAIAdapter');
+    
+    let provider = 'google';
+    let modelName = 'gemini-2.5-flash';
+    
+    if (apiKey.startsWith('gsk_')) {
+      provider = 'groq';
+      modelName = 'llama-3.2-90b-vision-preview';
+    } else if (apiKey.startsWith('sk-') || apiKey.startsWith('proj-')) {
+      provider = 'openai';
+      modelName = 'gpt-4o';
+    }
+
+    const adapter = new UniversalAIAdapter({
+      apiKey,
+      provider,
+      modelName,
     });
 
     const dataStr = JSON.stringify(extractedData, null, 2);
@@ -47,12 +65,14 @@ Your task:
 3. If a field is DERIVED (e.g., "Net Weight" = Gross - Tare) or you're UNSURE about its format/name, give it lower confidence (40-70) and flag it for user review.
 4. Only include fields that correspond to the provided extracted data or standard derived fields. Do not add arbitrary metadata like Timestamp or Sync Status unless explicitly present in the data.
 
+CRITICAL: The "key" field MUST perfectly match the exact original key from the extracted data JSON provided above. Do not convert it to snake_case or camelCase, preserve spaces and casing identically.
+
 Return ONLY a JSON object with a single key "fields", which contains an array of your proposed columns. Exactly like this:
 {
   "fields": [
     {
-      "key": "snake_case_key",
-      "label": "Human Readable Label",
+      "key": "Exact Original Key",
+      "label": "Human Readable Label (e.g. Donor Name)",
       "example": "example value",
       "confidence": 95,
       "reason": "Directly extracted from document",
@@ -61,14 +81,10 @@ Return ONLY a JSON object with a single key "fields", which contains an array of
   ]
 }`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-    });
-
-    const raw = response.choices[0].message.content || '{}';
+    const raw = await adapter.chat(
+      "You are a strict JSON returning data analyst.",
+      prompt
+    );
     let parsedData: Record<string, unknown> = {};
     
     try {

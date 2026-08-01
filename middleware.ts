@@ -4,11 +4,12 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   // Extract session token (handles both secure and non-secure environments)
   const token = request.cookies.get('next-auth.session-token') || request.cookies.get('__Secure-next-auth.session-token');
+  const isGuest = request.cookies.get('docsync_guest');
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
   const isApiRoute = request.nextUrl.pathname.startsWith('/api');
 
-  if (!token && !isLoginPage && !isApiRoute) {
+  if (!token && !isGuest && !isLoginPage && !isApiRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

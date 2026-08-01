@@ -4,9 +4,23 @@ import { useParams, useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import SheetSetupModal, { type SuggestedField } from '@/app/components/SheetSetupModal';
 import FieldReviewModal, { type ExtractedField } from '@/app/components/FieldReviewModal';
+import PrimaryKeyModal from '@/app/components/PrimaryKeyModal';
+import DuplicateAlert, { type DuplicateAction } from '@/app/components/DuplicateAlert';
 
 // Template stored in localStorage per profile
 const TEMPLATE_KEY = (profileId: string) => `docsync_template_v1_${profileId}`;
+
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  identity:  { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8', border: 'rgba(99,102,241,0.3)' },
+  financial: { bg: 'rgba(16,185,129,0.12)',  text: '#10b981', border: 'rgba(16,185,129,0.3)' },
+  date:      { bg: 'rgba(245,158,11,0.12)',  text: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+  contact:   { bg: 'rgba(236,72,153,0.12)',  text: '#ec4899', border: 'rgba(236,72,153,0.3)' },
+  metadata:  { bg: 'rgba(107,114,128,0.12)', text: '#9ca3af', border: 'rgba(107,114,128,0.3)' },
+  other:     { bg: 'rgba(107,114,128,0.08)', text: '#6b7280', border: 'rgba(107,114,128,0.2)' },
+};
+
+const catStyle = (cat?: string) => CATEGORY_COLORS[cat || 'other'] || CATEGORY_COLORS.other;
+const confColor = (c: number) => c >= 85 ? '#10b981' : c >= 65 ? '#f59e0b' : '#ef4444';
 
 type SavedTemplate = {
   fields: { key: string; label: string }[];
@@ -55,10 +69,46 @@ export default function ScanPage() {
 
   // Adaptive extraction state
   const [showFieldReview, setShowFieldReview] = useState(false);
+  const [pendingReview, setPendingReview] = useState(false);
+  const [pendingAutoSync, setPendingAutoSync] = useState<ExtractedField[] | null>(null);
   const [extractedFields, setExtractedFields] = useState<ExtractedField[]>([]);
   const [documentType, setDocumentType] = useState('');
   const [approvedFields, setApprovedFields] = useState<ExtractedField[] | null>(null);
   const [savedTemplate, setSavedTemplate] = useState<SavedTemplate | null>(() => loadTemplate(profileId));
+  const [syncResult, setSyncResult] = useState<{ success: boolean; details: ExtractedField[]; url: string } | null>(null);
+  const [showPrimaryKeyModal, setShowPrimaryKeyModal] = useState(false);
+  const [duplicateAlertData, setDuplicateAlertData] = useState<{ count: number; label: string; value: string; fieldsToSync: ExtractedField[]; existingSheetId: string | null; cols?: SheetColumn[] } | null>(null);
+
+  // Note & Audio State
+  const [noteText, setNoteText] = useState('');
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setAudioUrl(null);
+    }
+  }, [audioBlob]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+
+  useEffect(() => {
+    if (!isRecording && !isTranscribing) {
+      if (pendingReview) {
+        setShowFieldReview(true);
+        setPendingReview(false);
+      }
+      if (pendingAutoSync) {
+        setTimeout(() => onSyncClick(pendingAutoSync), 500);
+        setPendingAutoSync(null);
+      }
+    }
+  }, [isRecording, isTranscribing, pendingReview, pendingAutoSync]);
 
   // Sheet setup modal state
   const [showSheetModal, setShowSheetModal] = useState(false);
@@ -73,15 +123,69 @@ export default function ScanPage() {
     setIsMounted(true);
   }, []);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const toggleVoiceRecord = async () => {
+    if (isRecording) {
+      if (mediaRecorder) mediaRecorder.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/mp4' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+
+        // Call backend for Whisper transcription
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append('audio', blob, 'voicenote.webm');
+          const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (data.text) {
+            setNoteText(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+            toast.success('Audio transcribed successfully');
+          } else {
+            toast.error(data.error || 'Transcription failed (Check OpenAI Key)');
+          }
+        } catch (err) {
+          toast.error('Network error during transcription');
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      toast.success('Recording... tap mic to stop.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Microphone access denied');
+    }
+  };
+
+  const handleCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
       setImageSrc(url);
       setSelectedFile(file);
+      setExtractedFields([]);
       setApprovedFields(null);
+      setSyncResult(null);
+      setNoteText('');
+      setAudioBlob(null);
       setAuditLogs([]);
       setStats(null);
+      setPendingReview(false);
+      setPendingAutoSync(null);
     }
   };
 
@@ -130,22 +234,22 @@ export default function ScanPage() {
         const finalFields = [...matched, ...missing];
         setApprovedFields(finalFields);
 
-        // Check conditions for auto-sync: all template fields found AND all have >= 95 confidence
-        const allFound = missing.length === 0;
-        const allHighConfidence = matched.every((f: ExtractedField) => f.confidence >= 95);
-
         if (allFound && allHighConfidence) {
           setAuditLogs(prev => [...prev, { stage: 'Template', status: 'success', message: `Template matched perfectly (${matched.length} fields) with high confidence. Auto-syncing...` }]);
-          // Give React a tick to update the UI, then trigger sync
-          setTimeout(() => onSyncClick(finalFields), 500);
+          if (isRecording || isTranscribing) {
+            toast('Analysis complete! Auto-sync will start when voice note finishes.', { icon: '⏳' });
+            setPendingAutoSync(finalFields);
+          } else {
+            setTimeout(() => onSyncClick(finalFields), 500);
+          }
         } else {
           setAuditLogs(prev => [...prev, { stage: 'Template', status: 'warning', message: `Template applied but requires review. ${missing.length} missing, ${matched.filter((f: ExtractedField) => f.confidence < 95).length} low confidence.` }]);
-          toast('Please review the extracted data before syncing', { icon: '⚠️' });
+          toast('Extraction complete! Please review the data.', { icon: '✅' });
         }
       } else {
-        // Show review modal for first-time / discovery mode
+        // Show review inline for first-time / discovery mode
         setExtractedFields(data.fields);
-        setShowFieldReview(true);
+        toast('Extraction complete! You can review the fields on the right.', { icon: '✅' });
       }
 
     } catch (err) {
@@ -165,16 +269,24 @@ export default function ScanPage() {
       saveTemplate(profileId, fields.map(f => ({ key: f.key, label: f.label })));
       setSavedTemplate({ fields: fields.map(f => ({ key: f.key, label: f.label })), savedAt: new Date().toISOString() });
       toast.success(`✅ Template saved! Future scans will use ${fields.length} fields automatically.`, { duration: 5000 });
+      setShowPrimaryKeyModal(true);
     } else {
       toast(`🔄 Discovery mode — you'll review fields every scan.`, { duration: 4000 });
+      onSyncClick(fields);
     }
+  };
 
-    // Directly trigger sync step to avoid extra click
-    onSyncClick(fields);
+  const handlePrimaryKeyConfirm = (primaryKey: string | null) => {
+    setShowPrimaryKeyModal(false);
+    if (primaryKey) {
+      document.cookie = `docsync_pk_${profileId.replace(/-/g, '_')}=${primaryKey}; path=/; max-age=31536000`;
+      toast.success('Primary Key set! Duplicates will be blocked.');
+    }
+    if (approvedFields) onSyncClick(approvedFields);
   };
 
   // STEP 3: Sync approved fields to Sheets + Notion
-  const doSync = async (fields: ExtractedField[], sheetId: string | null, cols?: SheetColumn[]) => {
+  const doSync = async (fields: ExtractedField[], sheetId: string | null, cols?: SheetColumn[], duplicateAction?: DuplicateAction) => {
     setIsSyncing(true);
     const toastId = toast.loading('Syncing to Sheets & Notion...');
 
@@ -188,21 +300,38 @@ export default function ScanPage() {
       if (sheetId) formData.append('spreadsheetId', sheetId);
       if (cols) formData.append('columns', JSON.stringify(cols));
       if (selectedFile) formData.append('document', selectedFile);
+      if (duplicateAction) formData.append('duplicateAction', duplicateAction);
+      if (noteText) formData.append('noteText', noteText);
+      if (audioBlob) formData.append('audioFile', audioBlob, 'voicenote.webm');
 
       const res = await fetch('/api/sync', {
         method: 'POST',
         body: formData,
       });
+
+      if (res.status === 409) {
+        toast.dismiss(toastId);
+        const conflictData = await res.json();
+        setDuplicateAlertData({
+          count: conflictData.duplicateCount,
+          label: conflictData.primaryKeyLabel || 'Primary Key',
+          value: conflictData.primaryKeyValue,
+          fieldsToSync: fields,
+          existingSheetId: sheetId,
+          cols
+        });
+        setIsSyncing(false);
+        return;
+      }
+
       const result = await res.json();
       if (result.success) {
         toast.success('Successfully synced! ✅', { id: toastId });
-        if (spreadsheetUrl || result.spreadsheetUrl) {
-          toast.success(
-            <span>View your Sheet: <a href={spreadsheetUrl || result.spreadsheetUrl} target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>Open →</a></span>,
-            { duration: 6000 }
-          );
-        }
-        setTimeout(() => router.push('/'), 2000);
+        setSyncResult({
+          success: true,
+          details: fields,
+          url: spreadsheetUrl || result.spreadsheetUrl || result.syncDetails?.sheets || ''
+        });
       } else {
         toast.error(result.errors?.[0] || 'Sync failed', { id: toastId });
       }
@@ -259,7 +388,15 @@ export default function ScanPage() {
     if (typeof document === 'undefined') return null;
     const cookieName = `docsync_sheet_${profileId.replace(/-/g, '_')}`;
     const match = document.cookie.match(new RegExp(`(?:^|; )${cookieName}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : null;
+    const val = match ? decodeURIComponent(match[1]) : null;
+    
+    // Clear out old mock sheet IDs so the app uses the real Google Sheet from .env.local
+    if (val && val.startsWith('demo-sheet-')) {
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      return null;
+    }
+    
+    return val;
   }
 
   const getProfileTitle = () => {
@@ -351,7 +488,48 @@ export default function ScanPage() {
               ))}
             </div>
           )}
+          {profileId === 'ngo-receipt' && (
+            <a 
+              href="/sample-ngo-receipt.png" 
+              download="Sample_NGO_Receipt.png"
+              onClick={(e) => e.stopPropagation()} 
+              style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--accent-primary)', textDecoration: 'underline' }}
+            >
+              Don&apos;t have a document? Download a Sample NGO Receipt
+            </a>
+          )}
           <input type="file" accept="image/*" capture="environment" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCapture} />
+        </div>
+      ) : syncResult ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: '500px', width: '100%', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem', color: '#10b981' }}>✅</div>
+            <h2 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Sync Complete</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Your document has been successfully digitized and safely synced to your databases.</p>
+            
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginBottom: '2rem', textAlign: 'left' }}>
+              <h4 style={{ fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em' }}>Synced Data</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {syncResult.details.map((field) => (
+                  <div key={field.key} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-glass-border)', paddingBottom: '0.5rem' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{field.label}</span>
+                    <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{field.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+              {(syncResult.url && syncResult.url.startsWith('http')) && (
+                <a href={syncResult.url} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
+                  📊 Open Google Sheet
+                </a>
+              )}
+              <button className="btn btn-primary" onClick={() => router.push('/')}>
+                Scan Another Document
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
@@ -373,18 +551,53 @@ export default function ScanPage() {
 
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { fileInputRef.current?.click(); }}>Retake</button>
-              {selectedFile && !approvedFields && !isProcessing && (
+              {selectedFile && !isProcessing && (
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => extractFields(selectedFile)}>
                   {savedTemplate ? '🔍 Extract Approved Data' : '🔍 Extract All Fields'}
                 </button>
               )}
-              {approvedFields && !isProcessing && (
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setShowFieldReview(true); setExtractedFields(approvedFields); }}>
-                  ✏️ Re-review
-                </button>
-              )}
             </div>
             <input type="file" accept="image/*" capture="environment" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCapture} />
+
+            {/* Note & Voice Note */}
+            {selectedFile && (
+              <div style={{ marginTop: '1rem', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--bg-glass-border)' }}>
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>📝</span> Add a Note (Audio or Text)
+                </h4>
+                
+                {isTranscribing && (
+                  <div style={{ padding: '0.5rem', marginBottom: '0.75rem', fontSize: '0.8rem', background: 'rgba(59,130,246,0.1)', color: 'var(--accent-primary)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="animate-spin">⏳</span> AI is transcribing your voice...
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <textarea 
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Type a note or tap mic to record..."
+                    style={{ flex: 1, padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)', resize: 'vertical', minHeight: '60px', fontSize: '0.9rem' }}
+                  />
+                  <button 
+                    onClick={toggleVoiceRecord}
+                    disabled={isTranscribing}
+                    style={{ background: isRecording ? 'var(--error)' : 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-full)', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isTranscribing ? 'not-allowed' : 'pointer', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', opacity: isTranscribing ? 0.5 : 1 }}
+                  >
+                    {isRecording ? <span style={{fontSize:'1.2rem'}}>⏹️</span> : <span style={{fontSize:'1.2rem'}}>🎤</span>}
+                  </button>
+                </div>
+                
+                {audioUrl && !isRecording && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', background: 'var(--bg-card)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                    <audio controls src={audioUrl} style={{ height: '32px', flex: 1 }} />
+                    <button onClick={() => setAudioBlob(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', fontSize: '1.2rem' }} title="Delete Audio">
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Stats */}
             {stats && (
@@ -411,15 +624,15 @@ export default function ScanPage() {
             )}
           </div>
 
-          {/* Right Panel: Approved Fields */}
+          {/* Right Panel: Approved or Extracted Fields */}
           <div className="glass-panel" style={{ padding: '1.5rem', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
-                {approvedFields ? `Extracted Data (${approvedFields.length} fields)` : 'Extracted Data'}
+                {(approvedFields || extractedFields.length > 0) ? `Extracted Data (${(approvedFields || extractedFields).length} fields)` : 'Extracted Data'}
               </h3>
-              {approvedFields && !isProcessing && (
+              {(approvedFields || extractedFields.length > 0) && !isProcessing && (
                 <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', backgroundColor: 'rgba(245,158,11,0.15)', color: '#d97706', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
-                  Review Required
+                  {approvedFields ? 'Ready for Sync' : 'Needs Review'}
                 </span>
               )}
             </div>
@@ -434,31 +647,47 @@ export default function ScanPage() {
               <>
                 {/* Field Value List (editable inline) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem' }}>
-                  {approvedFields.map((field, i) => (
-                    <div key={field.key + i} style={{
-                      padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)',
-                      background: 'var(--bg-glass)', border: '1px solid var(--bg-glass-border)',
-                    }}>
-                      <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.3rem' }}>
-                        {field.label}
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue={field.value}
-                        onChange={e => {
-                          const updated = [...approvedFields];
-                          updated[i] = { ...updated[i], value: e.target.value };
-                          setApprovedFields(updated);
-                        }}
-                        style={{
-                          background: 'transparent', border: 'none', borderBottom: '1px solid var(--bg-glass-border)',
-                          color: 'var(--text-primary)', fontSize: '0.97rem', fontWeight: 500,
-                          width: '100%', outline: 'none', padding: '2px 0',
-                        }}
-                        placeholder="—"
-                      />
-                    </div>
-                  ))}
+                  {approvedFields.map((field, i) => {
+                    const cs = catStyle(field.category);
+                    const conf = field.confidence || 100;
+                    return (
+                      <div key={field.key + i} style={{
+                        padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)',
+                        background: 'var(--bg-glass)', border: '1px solid var(--bg-glass-border)',
+                        display: 'flex', gap: '1rem', alignItems: 'center'
+                      }}>
+                        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center', minWidth: '70px' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '3px 6px', background: cs.bg, color: cs.text, border: `1px solid ${cs.border}`, borderRadius: '4px', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                            {field.category || 'other'}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 6px', background: `${confColor(conf)}15`, color: confColor(conf), border: `1px solid ${confColor(conf)}30`, borderRadius: '4px' }}>
+                            {conf}%
+                          </span>
+                        </div>
+                        
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.3rem' }}>
+                            {field.label}
+                          </label>
+                          <input
+                            type="text"
+                            defaultValue={field.value}
+                            onChange={e => {
+                              const updated = [...approvedFields];
+                              updated[i] = { ...updated[i], value: e.target.value };
+                              setApprovedFields(updated);
+                            }}
+                            style={{
+                              background: 'transparent', border: 'none', borderBottom: '1px solid var(--bg-glass-border)',
+                              color: 'var(--text-primary)', fontSize: '0.97rem', fontWeight: 500,
+                              width: '100%', outline: 'none', padding: '2px 0',
+                            }}
+                            placeholder="—"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Sheet status */}
@@ -471,14 +700,38 @@ export default function ScanPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setApprovedFields(null); setAuditLogs([]); setStats(null); setImageSrc(null); }}>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setApprovedFields(null); setExtractedFields([]); setAuditLogs([]); setStats(null); setImageSrc(null); setSelectedFile(null); }}>
                     Discard
                   </button>
-                  <button className="btn btn-primary" style={{ flex: 2 }} disabled={isSyncing} onClick={() => onSyncClick()}>
-                    {isSyncing ? 'Syncing...' : existingSheetId ? '⬆️ Sync to Sheets & Notion' : '📊 Review & Create Sheet'}
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '0.9rem', fontSize: '1.05rem', marginTop: 'auto' }}
+                    onClick={() => onSyncClick(approvedFields)}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? 'Syncing...' : 'Sync to Database →'}
                   </button>
                 </div>
               </>
+            ) : extractedFields.length > 0 ? (
+              <div style={{ margin: '-1.5rem', height: 'calc(100% + 3rem)' }}>
+                <FieldReviewModal
+                  inline={true}
+                  imageSrc={imageSrc!}
+                  profileId={profileId}
+                  documentType="Document"
+                  fields={extractedFields}
+                  onConfirm={handleFieldsConfirmed}
+                  onCancel={() => {
+                    setApprovedFields(null);
+                    setExtractedFields([]);
+                    setAuditLogs([]);
+                    setStats(null);
+                    setImageSrc(null);
+                    setSelectedFile(null);
+                  }}
+                />
+              </div>
             ) : (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '3rem' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔍</div>
@@ -494,6 +747,29 @@ export default function ScanPage() {
             )}
           </div>
         </div>
+      )}
+
+      {showPrimaryKeyModal && savedTemplate && (
+        <PrimaryKeyModal
+          fields={savedTemplate.fields}
+          onConfirm={handlePrimaryKeyConfirm}
+        />
+      )}
+      
+      {duplicateAlertData && (
+        <DuplicateAlert
+          duplicateCount={duplicateAlertData.count}
+          primaryKeyLabel={duplicateAlertData.label}
+          primaryKeyValue={duplicateAlertData.value}
+          onAction={(action) => {
+            setDuplicateAlertData(null);
+            doSync(duplicateAlertData.fieldsToSync, duplicateAlertData.existingSheetId, duplicateAlertData.cols, action);
+          }}
+          onCancel={() => {
+            setDuplicateAlertData(null);
+            toast('Sync cancelled.', { icon: '🚫' });
+          }}
+        />
       )}
     </main>
   );

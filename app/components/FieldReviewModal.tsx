@@ -18,6 +18,7 @@ interface FieldReviewModalProps {
   fields: ExtractedField[];
   onConfirm: (approvedFields: ExtractedField[], saveAsTemplate: boolean) => void;
   onCancel: () => void;
+  inline?: boolean;
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -30,7 +31,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
 };
 
 export default function FieldReviewModal({
-  imageSrc, profileId, documentType, fields: initialFields, onConfirm, onCancel,
+  imageSrc, profileId, documentType, fields: initialFields, onConfirm, onCancel, inline = false
 }: FieldReviewModalProps) {
   const [fields, setFields] = useState<ExtractedField[]>(initialFields);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -187,12 +188,15 @@ export default function FieldReviewModal({
 
   // ─── STEP 1: Field Review UI ───────────────────────────────────────────────
   return (
-    <div style={{
+    <div style={inline ? {
+      display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)'
+    } : {
       position: 'fixed', inset: 0, zIndex: 1100,
       background: 'var(--bg-primary)',
       display: 'flex', overflow: 'hidden',
     }}>
       {/* LEFT: Image Panel */}
+      {!inline && (
       <div style={{
         width: imageZoomed ? '62%' : '42%',
         transition: 'width 300ms ease',
@@ -229,6 +233,7 @@ export default function FieldReviewModal({
           style={{ flex: 1, objectFit: 'contain', width: '100%', maxHeight: 'calc(100vh - 80px)', padding: '0.75rem' }}
         />
       </div>
+      )}
 
       {/* RIGHT: Review Panel */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', minWidth: 0, background: 'var(--bg-primary)' }}>
@@ -247,12 +252,14 @@ export default function FieldReviewModal({
                 AI found <strong style={{ color: 'var(--text-primary)' }}>{fields.length}</strong> fields from your document
               </p>
             </div>
-            <button
-              onClick={onCancel}
-              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--bg-glass-border)', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '1.2rem', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', lineHeight: 1, flexShrink: 0, boxShadow: 'var(--shadow-sm)' }}
-            >
-              ✕
-            </button>
+            {!inline && (
+              <button
+                onClick={onCancel}
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--bg-glass-border)', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '1.2rem', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', lineHeight: 1, flexShrink: 0, boxShadow: 'var(--shadow-sm)' }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Instruction Banner */}

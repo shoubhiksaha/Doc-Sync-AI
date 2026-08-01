@@ -6,10 +6,10 @@ if (!getApps().length) {
   try {
     initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // Handle escaped newlines in the private key
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        projectId: process.env.FIREBASE_PROJECT_ID || 'docsyncai1',
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        // Handle escaped newlines and surrounding quotes in the private key
+        privateKey: (process.env.FIREBASE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY)?.replace(/^"|"$/g, '').replace(/\\n/g, '\n'),
       }),
     });
     console.log('Firebase Admin initialized successfully.');
