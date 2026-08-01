@@ -12,8 +12,7 @@ import { NextRequest } from 'next/server';
 export async function saveMediaLocallyForDemo(
   archiveBuffer: Buffer | null,
   audioBuffer: Buffer | null,
-  profileId: string,
-  req: NextRequest
+  profileId: string
 ): Promise<{ imageUrl: string | null; audioUrl: string | null }> {
   let imageUrl: string | null = null;
   let audioUrl: string | null = null;

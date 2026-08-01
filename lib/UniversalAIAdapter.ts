@@ -1,4 +1,4 @@
-const MAX_AI_RESPONSE_BYTES = 2 * 1024 * 1024;
+
 const AI_REQUEST_TIMEOUT_MS = 120000;
 
 function stripMarkdownFences(raw: string): string {
@@ -110,7 +110,7 @@ export class UniversalAIAdapter {
             "Authorization": `Bearer ${this.apiKey}`
         };
 
-        const userContent: any[] = [{ type: "text", text: userPrompt }];
+        const userContent: Record<string, unknown>[] = [{ type: "text", text: userPrompt }];
         for (const img of images) {
             userContent.push({
                 type: "image_url",
@@ -122,7 +122,7 @@ export class UniversalAIAdapter {
         if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
         messages.push({ role: "user", content: userContent });
 
-        const payload: any = {
+        const payload: Record<string, unknown> = {
             model: this.modelName,
             messages,
             response_format: { type: "json_object" },
@@ -155,14 +155,14 @@ export class UniversalAIAdapter {
                 "x-goog-api-key": this.apiKey
             };
 
-            const userParts: any[] = [{ text: userPrompt }];
+            const userParts: Record<string, unknown>[] = [{ text: userPrompt }];
             for (const img of images) {
                 userParts.push({
                     inlineData: { mimeType: img.mimeType, data: img.base64Data }
                 });
             }
 
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 contents: [{ role: "user", parts: userParts }],
                 generationConfig: {
                     responseMimeType: "application/json",
@@ -207,7 +207,7 @@ export class UniversalAIAdapter {
             "Content-Type": "application/json"
         };
 
-        const userContent: any[] = [];
+        const userContent: Record<string, unknown>[] = [];
         for (const img of images) {
             userContent.push({
                 type: "image",
@@ -220,7 +220,7 @@ export class UniversalAIAdapter {
         }
         userContent.push({ type: "text", text: userPrompt });
 
-        const payload: any = {
+        const payload: Record<string, unknown> = {
             model: this.modelName,
             max_tokens: 4096,
             messages: [{ role: "user", content: userContent }],

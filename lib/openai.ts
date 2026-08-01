@@ -1,6 +1,5 @@
 import { OpenAI, toFile } from "openai";
-import { zodResponseFormat } from 'openai/helpers/zod';
-import { NgoReceiptSchema, FactoryWeightSlipSchema } from './schemas';
+
 
 import { UniversalAIAdapter } from './UniversalAIAdapter';
 

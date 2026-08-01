@@ -4,7 +4,7 @@ import { loadSettings } from '@/lib/settings-loader';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
 import { uploadToGDrive, ensureFolder, getGoogleAuth, makeFilePublic } from '@/lib/gdrive';
-import { transcribeAudio } from '@/lib/openai';
+
 import sharp from 'sharp';
 
 import { saveMediaLocallyForDemo } from '@/lib/demo-storage';
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let finalNoteText = noteText || '';
+    const finalNoteText = noteText || '';
     let audioBuffer: Buffer | null = null;
     
     if (audioFile) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       const saveImage = archiveBuffer && (!notionResult.success || 'dummy' in notionResult) ? archiveBuffer : null;
       const saveAudio = audioBuffer && uploadDest !== 'notion' ? audioBuffer : null;
       
-      const demoMedia = await saveMediaLocallyForDemo(saveImage, saveAudio, profileId, req);
+      const demoMedia = await saveMediaLocallyForDemo(saveImage, saveAudio, profileId);
       if (demoMedia.imageUrl) gdriveUrl = demoMedia.imageUrl;
       if (demoMedia.audioUrl) finalLinkToAudio = demoMedia.audioUrl;
     }
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
             };
           }
         } catch (err: unknown) {
-          if ((err as any)?.isDuplicateConflict) throw err;
+          if ((err as { isDuplicateConflict?: boolean })?.isDuplicateConflict) throw err;
           // Ignore other errors (e.g. "Unable to parse range" meaning tab doesn't exist yet)
         }
       }
@@ -416,7 +416,7 @@ export async function POST(req: NextRequest) {
     try {
       sheetsResult = await sheetsPromise;
     } catch (e: unknown) {
-      if ((e as any)?.isDuplicateConflict) {
+      if ((e as { isDuplicateConflict?: boolean })?.isDuplicateConflict) {
         return NextResponse.json(e, { status: 409 });
       }
       console.error('Google Sheets append error:', e);

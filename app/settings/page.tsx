@@ -32,6 +32,7 @@ function SettingsContent() {
       if (data.uploadDest) setUploadDest(data.uploadDest);
       if (data.isPersistent) setPersistent(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {

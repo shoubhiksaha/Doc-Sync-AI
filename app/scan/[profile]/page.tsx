@@ -108,6 +108,7 @@ export default function ScanPage() {
         setPendingAutoSync(null);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, isTranscribing, pendingReview, pendingAutoSync]);
 
   // Sheet setup modal state
@@ -154,7 +155,7 @@ export default function ScanPage() {
           } else {
             toast.error(data.error || 'Transcription failed (Check OpenAI Key)');
           }
-        } catch (err) {
+        } catch {
           toast.error('Network error during transcription');
         } finally {
           setIsTranscribing(false);
