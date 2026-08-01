@@ -7,47 +7,12 @@ import toast from 'react-hot-toast';
 export default function InitialSetupModal() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
-  const [showGuide, setShowGuide] = useState(false);
-  const [notionKey, setNotionKey] = useState('');
-  const [notionDb, setNotionDb] = useState('');
-  const [saving, setSaving] = useState(false);
-
   const skipSetup = async () => {
     document.cookie = "docsync_notion_skipped=true; path=/; max-age=315360000"; // 10 years
     // Set default destination to GDrive if they skip Notion
     document.cookie = "docsync_upload_dest=gdrive; path=/; max-age=315360000";
     setIsOpen(false);
     toast.success("Skipped! We'll just use Google Sheets & Drive for now.");
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          notionKey, 
-          notionDb,
-          uploadDest: 'notion' // Default to Notion only if they bother setting it up now
-        }),
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Notion Connected!");
-        setIsOpen(false);
-        router.refresh();
-      } else {
-        toast.error(data.error || "Failed to save settings");
-      }
-    } catch {
-      toast.error("Network error");
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (!isOpen) return null;

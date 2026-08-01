@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+
 import { loadSettings } from '@/lib/settings-loader';
 
 export type SuggestedField = {

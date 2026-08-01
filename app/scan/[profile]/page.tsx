@@ -108,7 +108,7 @@ export default function ScanPage() {
         setPendingAutoSync(null);
       }
     }
-  }, [isRecording, isTranscribing, pendingReview, pendingAutoSync]);
+  }, [isRecording, isTranscribing, pendingReview, pendingAutoSync, onSyncClick]);
 
   // Sheet setup modal state
   const [showSheetModal, setShowSheetModal] = useState(false);
@@ -154,7 +154,7 @@ export default function ScanPage() {
           } else {
             toast.error(data.error || 'Transcription failed (Check OpenAI Key)');
           }
-        } catch (err) {
+        } catch {
           toast.error('Network error during transcription');
         } finally {
           setIsTranscribing(false);
