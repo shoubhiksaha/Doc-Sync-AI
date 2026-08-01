@@ -19,7 +19,7 @@ export async function saveMediaLocallyForDemo(
     try {
       const formData = new FormData();
       formData.append('reqtype', 'fileupload');
-      formData.append('fileToUpload', new Blob([buffer]), fileName);
+      formData.append('fileToUpload', new Blob([new Uint8Array(buffer)]), fileName);
 
       const res = await fetch('https://catbox.moe/user/api.php', {
         method: 'POST',

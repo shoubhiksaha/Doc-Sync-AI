@@ -1,7 +1,7 @@
 import { google, drive_v3, Auth } from 'googleapis';
 import { Readable } from 'stream';
 
-export function getGoogleAuth(accessToken?: string): Auth.OAuth2Client | Auth.JWT | null {
+export function getGoogleAuth(accessToken?: string): any {
   if (accessToken) {
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
@@ -71,7 +71,7 @@ export async function uploadToGDrive(
     const auth = getGoogleAuth(accessToken || undefined);
     if (!auth) return null;
 
-    const drive = google.drive({ version: 'v3', auth });
+    const drive = google.drive({ version: 'v3', auth: auth as never });
 
     const rootId = await ensureFolder(drive, accessToken ? 'DocSync AI' : 'DocSync AI Demo');
     const mediaId = await ensureFolder(drive, accessToken ? 'DocSync AI Media' : 'DocSync AI Demo Media', rootId);

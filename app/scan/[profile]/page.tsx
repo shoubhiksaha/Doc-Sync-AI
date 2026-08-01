@@ -235,6 +235,9 @@ export default function ScanPage() {
         const finalFields = [...matched, ...missing];
         setApprovedFields(finalFields);
 
+        const allFound = missing.length === 0;
+        const allHighConfidence = matched.every((f: ExtractedField) => f.confidence >= 95);
+
         if (allFound && allHighConfidence) {
           setAuditLogs(prev => [...prev, { stage: 'Template', status: 'success', message: `Template matched perfectly (${matched.length} fields) with high confidence. Auto-syncing...` }]);
           if (isRecording || isTranscribing) {

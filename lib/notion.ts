@@ -93,7 +93,7 @@ export async function syncToNotion(
               object: 'block',
               type: 'audio',
               audio: { type: 'file_upload', file_upload: { id: notionAudioId } }
-            } as BlockObjectRequest
+            } as any
           ] : undefined
         }
       });

@@ -130,8 +130,8 @@ export async function POST(req: NextRequest) {
         return { success: true, mock: true };
       }
 
-      const drive = google.drive({ version: 'v3', auth: authClient });
-      const sheets = google.sheets({ version: 'v4', auth: authClient });
+      const drive = google.drive({ version: 'v3', auth: authClient as never });
+      const sheets = google.sheets({ version: 'v4', auth: authClient as never });
 
       // If no explicit ID, find or create "DocSync AI Data"
       if (!spreadsheetId) {
@@ -142,8 +142,8 @@ export async function POST(req: NextRequest) {
             fields: 'files(id, name)',
           });
           
-          if (res.data.files && res.data.files.length > 0) {
-            spreadsheetId = res.data.files[0].id as string;
+          if ((res.data as any).files && (res.data as any).files.length > 0) {
+            spreadsheetId = (res.data as any).files[0].id as string;
           } else {
             let sheetId = 0;
             // Create it

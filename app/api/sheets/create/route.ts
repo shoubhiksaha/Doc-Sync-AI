@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
     const errorMessage = error instanceof Error 
       ? (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || error.message 
       : 'Unknown error';
-    // @ts-expect-error - Expected error because drive.files.create payload types are complex and mismatched in googleapis
+
     const step = currentStep || 'unknown';
     return NextResponse.json({ 
       error: `Failed during ${step}. Google says: ${errorMessage}` 
