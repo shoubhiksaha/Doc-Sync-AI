@@ -33,8 +33,10 @@ describe('security', () => {
       const plaintext = 'sk-my-super-secret-key-123';
       const payload = generateAndWrapDEK(plaintext);
       
-      // Tamper with ciphertext
-      const tamperedPayload = { ...payload, encryptedKey: 'a' + payload.encryptedKey.substring(1) };
+      // Tamper with ciphertext in a guaranteed way
+      const firstChar = payload.encryptedKey.charAt(0);
+      const newFirstChar = firstChar === 'a' ? 'b' : 'a';
+      const tamperedPayload = { ...payload, encryptedKey: newFirstChar + payload.encryptedKey.substring(1) };
       
       expect(() => {
         unwrapAndDecryptDEK(tamperedPayload);
