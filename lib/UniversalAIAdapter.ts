@@ -2,7 +2,6 @@
 const AI_REQUEST_TIMEOUT_MS = 120000;
 
 function stripMarkdownFences(raw: string): string {
-    if (typeof raw !== 'string') return raw;
     return raw
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```\s*$/, '')
@@ -197,7 +196,7 @@ export class UniversalAIAdapter {
             return stripMarkdownFences(text);
         }
         
-        throw new Error('All fallback models failed');
+        return ''; // Unreachable due to the error thrown inside the loop
     }
 
     async _chatAnthropic(systemPrompt: string, userPrompt: string, images: VisionImage[]) {

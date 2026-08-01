@@ -1,5 +1,6 @@
 // ─── Mock googleapis before imports ───────────────────────────────────────────
 const mockFilesCreate = jest.fn();
+const mockFilesList = jest.fn();
 const mockPermissionsCreate = jest.fn();
 
 jest.mock('googleapis', () => ({
@@ -10,13 +11,13 @@ jest.mock('googleapis', () => ({
       })),
     },
     drive: jest.fn().mockReturnValue({
-      files: { create: mockFilesCreate },
+      files: { create: mockFilesCreate, list: mockFilesList },
       permissions: { create: mockPermissionsCreate },
     }),
   },
 }));
-
 import { uploadArchiveToGDrive } from '../../lib/gdrive-upload';
+import { google } from 'googleapis';
 
 const TEST_BUFFER = Buffer.from('fake-image-data');
 const FAKE_FILE_ID = 'gdrive-file-id-abc123';
@@ -24,7 +25,11 @@ const FAKE_FILE_ID = 'gdrive-file-id-abc123';
 describe('uploadArchiveToGDrive', () => {
   beforeEach(() => {
     mockFilesCreate.mockReset();
+    mockFilesList.mockReset();
     mockPermissionsCreate.mockReset();
+    
+    // Default list resolution to pretend folders exist
+    mockFilesList.mockResolvedValue({ data: { files: [{ id: 'fake-folder-id' }] } });
   });
 
   test('returns a GDrive view URL when upload succeeds', async () => {
@@ -57,6 +62,36 @@ describe('uploadArchiveToGDrive', () => {
 
     const url = await uploadArchiveToGDrive(TEST_BUFFER, 'test-file.jpg', 'token');
     expect(url).toBeNull();
+  });
+
+  it('returns null if upload fails', async () => {
+    (google.drive as unknown as jest.Mock).mockReturnValueOnce({
+      files: {
+        list: jest.fn().mockRejectedValue(new Error('Network error')),
+      }
+    });
+
+    const result = await uploadArchiveToGDrive(Buffer.from('test'), 'test.webp', 'fake-token');
+    expect(result).toBeNull();
+  });
+
+  it('creates folders if they do not exist', async () => {
+    const mockDrive = {
+      files: {
+        list: jest.fn()
+          .mockResolvedValueOnce({ data: { files: [] } })
+          .mockResolvedValueOnce({ data: { files: [] } }),
+        create: jest.fn()
+          .mockResolvedValueOnce({ data: { id: 'created-root-id' } })
+          .mockResolvedValueOnce({ data: { id: 'created-media-id' } })
+          .mockResolvedValueOnce({ data: { id: 'new-file-id' } }),
+      }
+    };
+    (google.drive as unknown as jest.Mock).mockReturnValueOnce(mockDrive);
+
+    const result = await uploadArchiveToGDrive(Buffer.from('test'), 'test.webp', 'fake-token');
+    expect(result).toBe('https://drive.google.com/file/d/new-file-id/view');
+    expect(mockDrive.files.create).toHaveBeenCalledTimes(3); // 2 folders + 1 file
   });
 
   test('calls the API with JPEG mime type and correct filename', async () => {
