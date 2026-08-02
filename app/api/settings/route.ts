@@ -95,6 +95,13 @@ export async function GET(req: NextRequest) {
   let isPersistent = req.cookies.get('docsync_persistent')?.value === 'true';
 
   // If they are missing keys (e.g. new device) but are logged in, check Firestore
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let db: any = null;
+  try {
+    const admin = await import('@/lib/firebase-admin');
+    db = admin.db;
+  } catch (err) {}
+
   if (db && (!hasOpenAiKey || !hasNotionKey || !hasNotionDbId)) {
     const token = await getToken({ req });
     if (token?.email) {
