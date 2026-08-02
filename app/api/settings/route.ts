@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encrypt } from '@/lib/crypto';
 import { getToken } from 'next-auth/jwt';
-import { db } from '@/lib/firebase-admin';
 import { generateAndWrapDEK } from '@/lib/security';
 
 export async function POST(req: NextRequest) {
@@ -44,9 +43,17 @@ export async function POST(req: NextRequest) {
     response.cookies.set('docsync_persistent', persistent ? 'true' : 'false', { ...cookieOptions, httpOnly: false });
 
     // 2. Persistent Mode (Firestore KMS Envelope Encryption)
-    if (persistent && db) {
-      const token = await getToken({ req });
-      if (token?.email) {
+    if (persistent) {
+      let db = null;
+      try {
+        const admin = await import('@/lib/firebase-admin');
+        db = admin.db;
+      } catch (err) {
+        console.error("Firebase admin dynamic import failed:", err);
+      }
+      if (db) {
+        const token = await getToken({ req });
+        if (token?.email) {
         const updateData: Record<string, unknown> = {};
         
         if (openaiKey) updateData.openaiKey = generateAndWrapDEK(openaiKey);
