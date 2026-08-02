@@ -29,28 +29,29 @@ export async function loadSettings(req: NextRequest): Promise<DocSyncSettings> {
     
     if (db) {
       const token = await getToken({ req });
-    if (token?.email) {
-      try {
-        const doc = await db.collection('users').doc(token.email).get();
-        if (doc.exists) {
-          const data = doc.data();
-          if (data) {
-            if (!openaiKey && data.openaiKey) {
-              openaiKey = unwrapAndDecryptDEK(data.openaiKey as KmsPayload);
-            }
-            if (!notionKey && data.notionKey) {
-              notionKey = unwrapAndDecryptDEK(data.notionKey as KmsPayload);
-            }
-            if (!notionDbId && data.notionDbId) {
-              notionDbId = unwrapAndDecryptDEK(data.notionDbId as KmsPayload);
-            }
-            if (data.uploadDest) {
-              uploadDest = data.uploadDest;
+      if (token?.email) {
+        try {
+          const doc = await db.collection('users').doc(token.email).get();
+          if (doc.exists) {
+            const data = doc.data();
+            if (data) {
+              if (!openaiKey && data.openaiKey) {
+                openaiKey = unwrapAndDecryptDEK(data.openaiKey as KmsPayload);
+              }
+              if (!notionKey && data.notionKey) {
+                notionKey = unwrapAndDecryptDEK(data.notionKey as KmsPayload);
+              }
+              if (!notionDbId && data.notionDbId) {
+                notionDbId = unwrapAndDecryptDEK(data.notionDbId as KmsPayload);
+              }
+              if (data.uploadDest) {
+                uploadDest = data.uploadDest;
+              }
             }
           }
+        } catch (err) {
+          console.error('Failed to load persistent settings from Firestore', err);
         }
-      } catch (err) {
-        console.error('Failed to load persistent settings from Firestore', err);
       }
     }
   }
