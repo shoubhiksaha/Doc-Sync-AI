@@ -61,6 +61,7 @@ export default function ScanPage() {
 
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const activeFileRef = useRef<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -179,6 +180,7 @@ export default function ScanPage() {
       const url = URL.createObjectURL(file);
       setImageSrc(url);
       setSelectedFile(file);
+      activeFileRef.current = file;
       setExtractedFields([]);
       setApprovedFields(null);
       setSyncResult(null);
@@ -236,9 +238,10 @@ export default function ScanPage() {
         img.onerror = () => resolve(file); // fallback if not an image
       });
       
-      // Update the selected file state with the compressed version
+      // Update the selected file state and ref with the compressed version
       // so the subsequent /api/sync call also sends the small version
       setSelectedFile(compressedFile);
+      activeFileRef.current = compressedFile;
 
       formData.append('document', compressedFile);
       formData.append('profileId', profileId);
@@ -352,7 +355,7 @@ export default function ScanPage() {
       formData.append('profileId', profileId);
       if (sheetId) formData.append('spreadsheetId', sheetId);
       if (cols) formData.append('columns', JSON.stringify(cols));
-      if (selectedFile) formData.append('document', selectedFile);
+      if (activeFileRef.current) formData.append('document', activeFileRef.current);
       if (duplicateAction) formData.append('duplicateAction', duplicateAction);
       if (noteText) formData.append('noteText', noteText);
       if (audioBlob) formData.append('audioFile', audioBlob, 'voicenote.webm');
@@ -753,7 +756,7 @@ export default function ScanPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setApprovedFields(null); setExtractedFields([]); setAuditLogs([]); setStats(null); setImageSrc(null); setSelectedFile(null); }}>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setApprovedFields(null); setExtractedFields([]); setAuditLogs([]); setStats(null); setImageSrc(null); setSelectedFile(null); activeFileRef.current = null; }}>
                     Discard
                   </button>
                   <button
@@ -781,7 +784,7 @@ export default function ScanPage() {
                     setAuditLogs([]);
                     setStats(null);
                     setImageSrc(null);
-                    setSelectedFile(null);
+                    setSelectedFile(null); activeFileRef.current = null;
                   }}
                 />
               </div>
