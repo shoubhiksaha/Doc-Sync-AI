@@ -198,7 +198,45 @@ export default function ScanPage() {
 
     try {
       const formData = new FormData();
-      formData.append('document', file);
+      
+      // Compress image client-side to bypass Vercel's 4.5MB Serverless Payload limit
+      const compressedFile = await new Promise<File>((resolve, reject) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1500;
+          const MAX_HEIGHT = 1500;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              resolve(file); // fallback
+            }
+          }, 'image/jpeg', 0.8); // 80% quality
+        };
+        img.onerror = () => resolve(file); // fallback if not an image
+      });
+
+      formData.append('document', compressedFile);
       formData.append('profileId', profileId);
 
       // If we have a saved template, hint the AI to focus on those fields
@@ -207,7 +245,13 @@ export default function ScanPage() {
       }
 
       const res = await fetch('/api/extract-freeform', { method: 'POST', body: formData });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(res.status === 413 ? "File too large (exceeds Vercel 4.5MB limit)" : "Server returned invalid response");
+      }
 
       if (!data.success) {
         toast.error(data.error || 'Extraction failed');
