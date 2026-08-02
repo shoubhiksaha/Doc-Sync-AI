@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encrypt } from '@/lib/crypto';
 import { getToken } from 'next-auth/jwt';
-import { db } from '@/lib/firebase-admin';
 import { generateAndWrapDEK } from '@/lib/security';
 
 export async function POST(req: NextRequest) {
@@ -44,6 +43,15 @@ export async function POST(req: NextRequest) {
     response.cookies.set('docsync_persistent', persistent ? 'true' : 'false', { ...cookieOptions, httpOnly: false });
 
     // 2. Persistent Mode (Firestore KMS Envelope Encryption)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let db: any = null;
+    try {
+      const admin = await import('@/lib/firebase-admin');
+      db = admin.db;
+    } catch (err) {
+      console.error("Firebase admin dynamic import failed:", err);
+    }
+
     if (persistent && db) {
       const token = await getToken({ req });
       if (token?.email) {
@@ -87,6 +95,15 @@ export async function GET(req: NextRequest) {
   let isPersistent = req.cookies.get('docsync_persistent')?.value === 'true';
 
   // If they are missing keys (e.g. new device) but are logged in, check Firestore
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let db: any = null;
+  try {
+    const admin = await import('@/lib/firebase-admin');
+    db = admin.db;
+  } catch {
+    // Ignore dynamic import failure
+  }
+
   if (db && (!hasOpenAiKey || !hasNotionKey || !hasNotionDbId)) {
     const token = await getToken({ req });
     if (token?.email) {
