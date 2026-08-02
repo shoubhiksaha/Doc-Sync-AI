@@ -200,7 +200,7 @@ export default function ScanPage() {
       const formData = new FormData();
       
       // Compress image client-side to bypass Vercel's 4.5MB Serverless Payload limit
-      const compressedFile = await new Promise<File>((resolve, reject) => {
+      const compressedFile = await new Promise<File>((resolve) => {
         const img = new Image();
         img.src = URL.createObjectURL(file);
         img.onload = () => {
@@ -249,7 +249,7 @@ export default function ScanPage() {
       let data;
       try {
         data = await res.json();
-      } catch (e) {
+      } catch {
         throw new Error(res.status === 413 ? "File too large (exceeds Vercel 4.5MB limit)" : "Server returned invalid response");
       }
 
