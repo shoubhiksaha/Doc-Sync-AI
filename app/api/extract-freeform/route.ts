@@ -1,5 +1,5 @@
-export const maxDuration = 60;
 import { NextRequest, NextResponse } from 'next/server';
+export const maxDuration = 60;
 import sharp from 'sharp';
 import { UniversalAIAdapter } from '@/lib/UniversalAIAdapter';
 import { loadSettings } from '@/lib/settings-loader';

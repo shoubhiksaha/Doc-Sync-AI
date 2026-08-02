@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export const maxDuration = 60;
 import { NextRequest, NextResponse } from 'next/server';
+export const maxDuration = 60;
 import { syncToNotion } from '@/lib/notion';
 import { loadSettings } from '@/lib/settings-loader';
 import { google } from 'googleapis';
