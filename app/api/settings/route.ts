@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set('docsync_persistent', persistent ? 'true' : 'false', { ...cookieOptions, httpOnly: false });
 
     // 2. Persistent Mode (Firestore KMS Envelope Encryption)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let db: any = null;
     try {
       const admin = await import('@/lib/firebase-admin');
