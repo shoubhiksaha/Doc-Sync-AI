@@ -100,7 +100,9 @@ export async function GET(req: NextRequest) {
   try {
     const admin = await import('@/lib/firebase-admin');
     db = admin.db;
-  } catch (err) {}
+  } catch {
+    // Ignore dynamic import failure
+  }
 
   if (db && (!hasOpenAiKey || !hasNotionKey || !hasNotionDbId)) {
     const token = await getToken({ req });
