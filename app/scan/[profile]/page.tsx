@@ -235,6 +235,10 @@ export default function ScanPage() {
         };
         img.onerror = () => resolve(file); // fallback if not an image
       });
+      
+      // Update the selected file state with the compressed version
+      // so the subsequent /api/sync call also sends the small version
+      setSelectedFile(compressedFile);
 
       formData.append('document', compressedFile);
       formData.append('profileId', profileId);
