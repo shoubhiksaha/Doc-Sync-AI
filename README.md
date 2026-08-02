@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DocSync AI - AI Agents for Bharat's Businesses
 
-## Getting Started
+DocSync AI is a full-stack, mobile-first web app (PWA) designed to eliminate manual data entry for Indian NGOs and factory floors. It leverages vision AI to instantly extract structured data from unstructured physical documents (receipts, delivery challans, slips) and automatically synchronizes them to Google Sheets and Notion.
 
-First, run the development server:
+**Track 6: AI Agents for Bharat's Businesses**
+
+## Prerequisites
+* **Demo Mode:** Deploys and runs the full demo with NO login and NO API key required from the user. It uses server-side environment variables and seeded storage for a zero-friction demo experience.
+* **Live Mode (Optional):** Requires a Google OAuth Client ID, a Google Service Account (for background Sheets syncing), and an `OPENAI_API_KEY` (or Groq/Gemini key) to power the extraction engine dynamically per-user.
+
+## Run Locally
 
 ```bash
+# 1. Install dependencies
+npm install
+
+# 2. Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser. Click **"Try Demo Mode (No Login)"** to test the complete extraction and sync workflow instantly.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Vercel Deploy (5-Minute Guide)
+1. Push this repository to GitHub.
+2. Go to [Vercel](https://vercel.com) and click **"Add New Project"**.
+3. Import your GitHub repository.
+4. In the **Environment Variables** section, copy and paste the contents of `.env.example`. Replace the placeholder values for `OPENAI_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, and `GOOGLE_PRIVATE_KEY` with real values to ensure Demo Mode works globally.
+5. Click **Deploy**. Your app will be live and ready for testing in under 5 minutes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How Codex Built This
+* **Hackathon Transparency Statement:** Planning, wireframes, and architecture were done using free external tools; all application code was generated and iterated on with Codex.
 
-## Learn More
+Codex orchestrated this entire application, from the Next.js App Router scaffolding to the complex multi-modal AI abstractions. 
+* **Multi-model Architecture:** Built a `UniversalAIAdapter` that seamlessly routes between OpenAI, Groq, and Gemini, providing automatic fallback logic.
+* **Serverless Resiliency:** Solved Next.js serverless limitations by implementing client-side image compression (`HTML5 Canvas`), entirely bypassing Vercel's strict 4.5MB payload limits before hitting the backend.
+* **Seamless Testing:** Implemented a robust "Demo Mode" that dynamically mocks Google OAuth and Google Drive scopes so hackathon judges can test the full PWA without a single configuration step.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 5-Line Demo Video Script
+1. *(Show Mobile UI)* "Welcome to DocSync AI. I'm a factory manager checking in a delivery slip, so I'll hit 'Scan Document'."
+2. *(Take Photo)* "I just snap a photo of this messy, handwritten receipt."
+3. *(Show AI Extraction)* "Our vision agent instantly parses the chaotic handwriting into perfect structured JSON data, automatically categorizing items and prices."
+4. *(Show Approval)* "I confirm the data looks good, and DocSync immediately syncs this straight into our master Google Sheet and Notion."
+5. *(Show Google Sheet)* "No manual typing, no lost paperwork. Instant digital ledgers for Bharat's businesses."
