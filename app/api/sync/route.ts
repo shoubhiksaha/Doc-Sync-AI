@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     
     // If in demo mode and no sheet ID was provided, use the fallback demo sheet
     if (!accessToken && !explicitSpreadsheetId) {
-      explicitSpreadsheetId = process.env.GOOGLE_SHEET_ID;
+      explicitSpreadsheetId = process.env.GOOGLE_SHEET_ID || null;
     }
 
     const sheetsPromise = (async () => {
