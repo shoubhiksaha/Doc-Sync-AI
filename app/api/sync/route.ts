@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     let finalLinkToAudio: string | null = null;
     
     // --- Notion Sync ---
-    let notionResult = { success: false, dummy: false, url: null as string | null };
+    let notionResult: { success: boolean; dummy?: boolean; url: string | null } = { success: false, dummy: false, url: null };
     if (uploadDest === 'both' || uploadDest === 'notion') {
       try {
         if (profileId === 'ngo-receipt' || profileId === 'factory-weight-slip') {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // --- Google Drive / Local Storage Upload ---
     if (accessToken) {
       // Normal flow: User logged in, upload to their Google Drive
-      if (archiveBuffer && (!notionResult.success || 'dummy' in notionResult)) {
+      if (archiveBuffer && (!notionResult.success || notionResult.dummy)) {
         const fileName = `${profileId}_${Date.now()}.webp`;
         gdriveUrl = await uploadToGDrive(accessToken, archiveBuffer, fileName);
       }
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Demo flow: Modular local storage (can be easily deleted later)
-      const saveImage = archiveBuffer && (!notionResult.success || 'dummy' in notionResult) ? archiveBuffer : null;
+      const saveImage = archiveBuffer && (!notionResult.success || notionResult.dummy) ? archiveBuffer : null;
       const saveAudio = audioBuffer && uploadDest !== 'notion' ? audioBuffer : null;
       
       const demoMedia = await saveMediaLocallyForDemo(saveImage, saveAudio, profileId);
