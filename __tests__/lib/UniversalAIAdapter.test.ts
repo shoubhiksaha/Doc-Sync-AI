@@ -25,7 +25,7 @@ describe('UniversalAIAdapter', () => {
     expect(openaiAdapter.modelName).toBe('gpt-4o');
 
     const googleAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
-    expect(googleAdapter.modelName).toBe('gemini-2.5-flash');
+    expect(googleAdapter.modelName).toBe('gemini-3.5-flash');
 
     const groqAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'groq' });
     expect(groqAdapter.modelName).toBe('llama-3.2-90b-vision-preview');
