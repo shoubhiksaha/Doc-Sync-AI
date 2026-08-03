@@ -85,7 +85,7 @@ DO NOT wrap the response in markdown \`\`\`json. Return raw JSON.`;
     }
     
     auditLogs.push({ stage: 'Extraction', status: 'success', message: 'Stage 1 completed successfully.' });
-  } catch (err) {
+  } catch {
     auditLogs.push({ stage: 'Extraction', status: 'error', message: 'Stage 1 failed. Triggering Self-Healing fallback.' });
     extractedData = null;
   }
