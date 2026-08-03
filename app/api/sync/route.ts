@@ -118,7 +118,17 @@ export async function POST(req: NextRequest) {
     // --- Google Sheets Sync ---
     // The user might have provided an explicit sheet ID, but we want to auto-create and manage one 
     // using drive.file scope if none works or none is provided.
-    const explicitSpreadsheetId = clientSheetId || (!accessToken ? process.env.GOOGLE_SHEET_ID : null);
+    let explicitSpreadsheetId = clientSheetId;
+    
+    // If a logged-in user accidentally sends the Demo Sheet ID (e.g. from an old cookie), ignore it.
+    if (accessToken && explicitSpreadsheetId && explicitSpreadsheetId === process.env.GOOGLE_SHEET_ID) {
+      explicitSpreadsheetId = null;
+    }
+    
+    // If in demo mode and no sheet ID was provided, use the fallback demo sheet
+    if (!accessToken && !explicitSpreadsheetId) {
+      explicitSpreadsheetId = process.env.GOOGLE_SHEET_ID;
+    }
 
     const sheetsPromise = (async () => {
       let spreadsheetId = explicitSpreadsheetId;
