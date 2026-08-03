@@ -38,7 +38,7 @@ export class UniversalAIAdapter {
         if (config.modelName) {
             this.modelName = config.modelName;
         } else if (this.provider === 'google') {
-            this.modelName = 'gemini-3.5-flash';
+            this.modelName = 'gemini-3.6-flash';
         } else if (this.provider === 'groq') {
             this.modelName = 'llama-3.2-90b-vision-preview';
         } else if (this.provider === 'anthropic') {
@@ -142,7 +142,7 @@ export class UniversalAIAdapter {
     }
 
     async _chatGoogle(systemPrompt: string, userPrompt: string, images: VisionImage[]) {
-        const modelsToTry = [this.modelName, 'gemini-3.5-flash-lite'];
+        const modelsToTry = [this.modelName, 'gemini-3-flash-preview', 'gemini-2.5-flash-image'];
         const uniqueModels = Array.from(new Set(modelsToTry));
 
         for (let i = 0; i < uniqueModels.length; i++) {
@@ -178,8 +178,8 @@ export class UniversalAIAdapter {
             const response = await this._fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
             if (!response.ok) {
                 const errBody = await response.text().catch(() => '');
-                // Try fallback on 5xx or 404 (model not found)
-                if ((response.status >= 500 || response.status === 404) && i < uniqueModels.length - 1) {
+                // Try fallback on 5xx, 429 (Rate Limit/Quota), or 404 (model not found)
+                if ((response.status >= 500 || response.status === 429 || response.status === 404) && i < uniqueModels.length - 1) {
                     console.warn(`Google API Error with ${modelToTry}: ${response.status}. Trying fallback...`);
                     continue;
                 }
