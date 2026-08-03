@@ -369,31 +369,31 @@ export async function POST(req: NextRequest) {
       if (actualSchemaKeys) {
         rowValues = actualSchemaKeys.map((key, idx) => {
           let val: unknown = '';
-          if (key === 'synced_at') val = new Date().toISOString();
-          else if (key === 'sync_status') val = 'Success';
-          else if (key === 'link_to_image') val = finalLinkToImage;
-          else if (key === 'notes') val = finalNoteText;
-          else if (key === 'voice_note_link') val = finalLinkToAudio || '';
-          else if (key === 'net_weight') {
+          const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normKey = normalize(key);
+
+          if (normKey === 'syncedat') val = new Date().toISOString();
+          else if (normKey === 'syncstatus') val = 'Success';
+          else if (normKey === 'linktoimage') val = finalLinkToImage;
+          else if (normKey === 'notes' || normKey === 'notestextaudio') val = finalNoteText;
+          else if (normKey === 'voicenotelink' || normKey === 'voicenoteaudiolink') val = finalLinkToAudio || '';
+          else if (normKey === 'netweight') {
             const fw = data as Record<string, unknown>;
             val = (Number(fw.grossWeight) ?? 0) - (Number(fw.tareWeight) ?? 0);
           } else {
             const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
             const dataRec = data as Record<string, unknown>;
             
-            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normTarget = normalize(key);
-            
             const exactMatch = dataRec[key] ?? dataRec[camelKey];
             if (exactMatch !== undefined && exactMatch !== '') {
               val = exactMatch;
             } else {
-              const foundKey = Object.keys(dataRec).find(k => normalize(k) === normTarget);
+              const foundKey = Object.keys(dataRec).find(k => normalize(k) === normKey);
               val = foundKey ? dataRec[foundKey] : '';
             }
           }
 
-          if (key === pkRaw) {
+          if (pkRaw && normKey === normalize(pkRaw)) {
             pkIndex = idx;
             pkValue = String(val);
           }
