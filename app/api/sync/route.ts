@@ -313,7 +313,17 @@ export async function POST(req: NextRequest) {
           } else {
             const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
             const dataRec = data as Record<string, unknown>;
-            val = dataRec[camelKey] ?? dataRec[key] ?? '';
+            
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normTarget = normalize(key);
+            
+            const exactMatch = dataRec[key] ?? dataRec[camelKey];
+            if (exactMatch !== undefined && exactMatch !== '') {
+              val = exactMatch;
+            } else {
+              const foundKey = Object.keys(dataRec).find(k => normalize(k) === normTarget);
+              val = foundKey ? dataRec[foundKey] : '';
+            }
           }
 
           if (key === pkRaw) {
