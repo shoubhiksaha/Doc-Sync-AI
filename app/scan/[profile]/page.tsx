@@ -403,8 +403,23 @@ export default function ScanPage() {
     if (!fieldsToSync) return;
     const existingSheetId = getSheetIdFromCookie() || spreadsheetId;
 
-    // Directly sync! The backend will dynamically generate or expand the Google Sheet columns.
-    await doSync(fieldsToSync, existingSheetId || null);
+    if (existingSheetId) {
+      await doSync(fieldsToSync, existingSheetId);
+    } else {
+      // First time! User needs to confirm the schema.
+      // Sucked directly from the image extraction:
+      const generatedFields: SuggestedField[] = fieldsToSync.map(f => ({
+        key: f.key,
+        label: f.label || f.key.replace(/_([a-z])/g, (_, c) => c.toUpperCase()).replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim(),
+        example: String(f.value),
+        confidence: 100,
+        reason: 'Directly extracted from document',
+        required: true
+      }));
+      setSuggestedFields(generatedFields);
+      setShowSheetModal(true);
+      setPendingSyncFields(fieldsToSync);
+    }
   };
 
   const handleModalConfirm = async (cols: SheetColumn[], newSheetId: string, newSheetUrl: string) => {
@@ -417,6 +432,7 @@ export default function ScanPage() {
       setPendingSyncFields(null);
     }
   };
+
 
   function getSheetIdFromCookie(): string | null {
     if (typeof document === 'undefined') return null;
