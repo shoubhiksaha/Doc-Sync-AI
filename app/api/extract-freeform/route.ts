@@ -3,6 +3,7 @@ export const maxDuration = 60;
 import sharp from 'sharp';
 import { UniversalAIAdapter } from '@/lib/UniversalAIAdapter';
 import { loadSettings } from '@/lib/settings-loader';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -19,6 +20,12 @@ function detectProviderAndModel(key: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 20 extractions per 10 minutes per IP
+    const isAllowed = await checkRateLimit(req, 20, 10 * 60 * 1000);
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    }
+
     const formData = await req.formData();
     const file = formData.get('document') as File | null;
     const profileId = (formData.get('profileId') as string) || 'unknown';
