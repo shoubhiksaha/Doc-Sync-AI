@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY 
-  ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex') 
-  : crypto.createHash('sha256').update('docsync-ai-hackathon-fallback').digest();
+const ENCRYPTION_KEY_HEX = process.env.ENCRYPTION_KEY || (process.env.NODE_ENV === 'test' ? '0000000000000000000000000000000000000000000000000000000000000000' : null);
+if (!ENCRYPTION_KEY_HEX) {
+  throw new Error('ENCRYPTION_KEY environment variable is required in production.');
+}
+const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
