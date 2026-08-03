@@ -383,7 +383,9 @@ export async function POST(req: NextRequest) {
           else if (normKey === 'voicenotelink' || normKey === 'voicenoteaudiolink') val = finalLinkToAudio || '';
           else if (normKey === 'netweight') {
             const fw = data as Record<string, unknown>;
-            val = (Number(fw.grossWeight) ?? 0) - (Number(fw.tareWeight) ?? 0);
+            const gross = Number(fw.grossWeight) || 0;
+            const tare = Number(fw.tareWeight) || 0;
+            val = gross - tare;
           } else {
             const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
             const dataRec = data as Record<string, unknown>;
@@ -534,7 +536,7 @@ export async function POST(req: NextRequest) {
       return { success: true, spreadsheetId: spreadsheetId as string };
     })();
 
-    let sheetsResult: { success: boolean; spreadsheetId?: string; mock?: boolean };
+    let sheetsResult: { success: boolean; spreadsheetId?: string; mock?: boolean; error?: string };
     try {
       sheetsResult = await sheetsPromise;
     } catch (e: unknown) {
@@ -542,7 +544,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(e, { status: 409 });
       }
       console.error('Google Sheets append error:', e);
-      sheetsResult = { success: false };
+      sheetsResult = { success: false, error: e instanceof Error ? e.message : String(e) };
     }
 
     const errors: string[] = [];
@@ -556,14 +558,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!sheetsResult.success) {
-      errors.push('Google Sheets Sync Failed');
+      errors.push(`Google Sheets Sync Failed: ${sheetsResult.error || 'Unknown Error'}`);
       syncDetails.sheets = 'failed';
     } else {
       syncDetails.sheets = sheetsResult.spreadsheetId ? 'success' : 'skipped';
     }
 
     if (errors.length > 0) {
-      return NextResponse.json({ success: false, errors, syncDetails }, { status: 500 });
+      return NextResponse.json({ success: false, errors, syncDetails, debugMessage: sheetsResult.error }, { status: 500 });
     }
 
     let finalMessage = 'Successfully synced to all destinations';
@@ -581,6 +583,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('API Sync Error:', error);
-    return NextResponse.json({ error: 'An internal error occurred during data sync' }, { status: 500 });
+    return NextResponse.json({ error: `An internal error occurred during data sync: ${error instanceof Error ? error.message : String(error)}` }, { status: 500 });
   }
 }
