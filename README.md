@@ -1,7 +1,7 @@
 # DocSync AI - AI Agents for Bharat's Businesses
 
 [![Live Demo](https://img.shields.io/badge/Live_App-docsync.analogdigital.tech-blue?style=for-the-badge)](https://docsync.analogdigital.tech)
-[![Demo Video](https://img.shields.io/badge/Demo_Video-Watch_Here-red?style=for-the-badge)](#)
+[![Demo Video](https://img.shields.io/badge/Demo_Video-Watch_Here-red?style=for-the-badge)](https://youtu.be/4H7RTwGbt1I)
 [![Presentation](https://img.shields.io/badge/Pitch_Deck-View_Presentation-green?style=for-the-badge)](./PRESENTATION.md)
 
 DocSync AI is a full-stack, mobile-first web app (PWA) designed to eliminate manual data entry for Indian NGOs and factory floors. It leverages vision AI to instantly extract structured data from unstructured physical documents (receipts, delivery challans, slips) and automatically synchronizes them to Google Sheets and Notion.

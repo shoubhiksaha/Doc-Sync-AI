@@ -25,5 +25,5 @@
 * **Enterprise Security:** AES-256-GCM encrypted BYOK (Bring Your Own Key) and simulated KMS.
 
 ## Slide 5: The Demo
-* **[🎥 Watch Demo Video](#)** *(Replace with YouTube/Loom link)*
+* **[🎥 Watch Demo Video](https://youtu.be/4H7RTwGbt1I)**
 * **[🌐 Live App](https://docsync.analogdigital.tech)**
