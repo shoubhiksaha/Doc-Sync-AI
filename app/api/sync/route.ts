@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const maxDuration = 60;
 import { syncToNotion } from '@/lib/notion';
 import { loadSettings } from '@/lib/settings-loader';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { google } from 'googleapis';
 import { getToken } from 'next-auth/jwt';
 import { uploadToGDrive, ensureFolder, getGoogleAuth, makeFilePublic } from '@/lib/gdrive';
@@ -13,6 +14,12 @@ import { saveMediaLocallyForDemo } from '@/lib/demo-storage';
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 20 syncs per 10 minutes per IP
+    const isAllowed = await checkRateLimit(req, 20, 10 * 60 * 1000);
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    }
+
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || '' });
     const accessToken = token?.accessToken as string | undefined;
 
@@ -295,12 +302,72 @@ export async function POST(req: NextRequest) {
       const pkCookieName = `docsync_pk_${profileId.replace(/-/g, '_')}`;
       const pkRaw = req.cookies.get(pkCookieName)?.value;
 
-      let rowValues: unknown[];
+      let actualSchemaKeys = schemaKeys;
+      try {
+        const headerRes = await sheets.spreadsheets.values.get({
+          spreadsheetId: spreadsheetId as string,
+          range: `${sheetName}!1:1`
+        });
+        const sheetHeaders = headerRes.data.values?.[0] as string[] | undefined;
+        if (sheetHeaders && sheetHeaders.length > 0) {
+          actualSchemaKeys = sheetHeaders;
+        }
+      } catch (err) {
+        // Ignore, fallback to cookie
+      }
+
       let pkIndex = -1;
       let pkValue: string | undefined;
 
-      if (schemaKeys) {
-        rowValues = schemaKeys.map((key, idx) => {
+      // Ensure actualSchemaKeys is completely dynamic based on the image upload!
+      const dataRec = data as Record<string, unknown>;
+      const dataKeys = Object.keys(dataRec);
+      const metaKeys = ['notes', 'voice_note_link', 'link_to_image', 'synced_at', 'sync_status'];
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      if (!actualSchemaKeys) {
+        // First sync ever: Build headers directly from the image data
+        actualSchemaKeys = [...dataKeys, ...metaKeys];
+        
+        try {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: spreadsheetId as string,
+            range: `${sheetName}!A1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [actualSchemaKeys] }
+          });
+        } catch (e) { console.error("Could not write initial headers:", e); }
+      } else {
+        // Existing sheet: Find any new data fields from the image that aren't in the sheet
+        const normSchemaKeys = actualSchemaKeys.map(normalize);
+        const missingKeys = dataKeys.filter(k => !normSchemaKeys.includes(normalize(k)));
+        
+        if (missingKeys.length > 0) {
+          // Insert new keys right before the metadata columns (if they exist)
+          const metaNorm = metaKeys.map(normalize);
+          let insertIndex = actualSchemaKeys.length;
+          for (let i = 0; i < actualSchemaKeys.length; i++) {
+             if (metaNorm.includes(normalize(actualSchemaKeys[i]))) {
+                 insertIndex = i;
+                 break;
+             }
+          }
+          actualSchemaKeys.splice(insertIndex, 0, ...missingKeys);
+          
+          try {
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: spreadsheetId as string,
+              range: `${sheetName}!A1`,
+              valueInputOption: 'USER_ENTERED',
+              requestBody: { values: [actualSchemaKeys] }
+            });
+          } catch (e) { console.error("Could not update headers:", e); }
+        }
+      }
+
+      let rowValues: unknown[] = [];
+      if (actualSchemaKeys) {
+        rowValues = actualSchemaKeys.map((key, idx) => {
           let val: unknown = '';
           if (key === 'synced_at') val = new Date().toISOString();
           else if (key === 'sync_status') val = 'Success';
@@ -332,11 +399,6 @@ export async function POST(req: NextRequest) {
           }
           return val;
         });
-      } else {
-        const baseRow = profileId === 'ngo-receipt'
-          ? [data.date, data.donorName, data.amount, data.panNumber || '']
-          : [data.date, data.vehicleNumber, data.grossWeight, data.tareWeight];
-        rowValues = [...baseRow, finalNoteText, finalLinkToAudio || '', finalLinkToImage, new Date().toISOString(), 'Success'];
       }
 
       // ----------------------------------------------------
