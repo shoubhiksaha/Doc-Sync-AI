@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
         if (sheetHeaders && sheetHeaders.length > 0) {
           actualSchemaKeys = sheetHeaders;
         }
-      } catch (_) {
+      } catch {
         // Ignore, fallback to cookie
       }
 
