@@ -25,7 +25,7 @@ describe('UniversalAIAdapter', () => {
     expect(openaiAdapter.modelName).toBe('gpt-4o');
 
     const googleAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
-    expect(googleAdapter.modelName).toBe('gemini-3.5-flash');
+    expect(googleAdapter.modelName).toBe('gemini-3.6-flash');
 
     const groqAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'groq' });
     expect(groqAdapter.modelName).toBe('llama-3.2-90b-vision-preview');
@@ -161,14 +161,16 @@ describe('UniversalAIAdapter', () => {
     it('throws error if all fallbacks fail', async () => {
       (global.fetch as jest.Mock)
         .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err1' })
-        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err2' });
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err2' })
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'err3' });
 
       const adapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
-      await expect(adapter.chat('sys', 'user')).rejects.toThrow('Google API Error: 500 - err2');
+      await expect(adapter.chat('sys', 'user')).rejects.toThrow('Google API Error: 500 - err3');
     });
 
     it('falls back to empty string if error text fails', async () => {
       (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => { throw new Error('fail'); } })
         .mockResolvedValueOnce({ ok: false, status: 500, text: async () => { throw new Error('fail'); } })
         .mockResolvedValueOnce({ ok: false, status: 400, text: async () => { throw new Error('fail'); } });
 
@@ -178,6 +180,7 @@ describe('UniversalAIAdapter', () => {
 
     it('falls back if text is missing', async () => {
       (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
         .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
         .mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'fallback-text' }] } }] }) });
 

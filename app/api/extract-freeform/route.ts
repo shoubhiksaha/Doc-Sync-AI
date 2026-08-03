@@ -24,7 +24,7 @@ function detectProviderAndModel(key: string): ProviderConfig {
     return { provider: 'openai', modelName: 'gpt-4o' };
   } else {
     // Default to Gemini (starts with AIza... or AQ...)
-    return { provider: 'google', modelName: 'gemini-3.5-flash' };
+    return { provider: 'google', modelName: 'gemini-3.6-flash' };
   }
 }
 

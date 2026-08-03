@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const { UniversalAIAdapter } = await import('@/lib/UniversalAIAdapter');
 
     let provider = 'google';
-    let modelName = 'gemini-3.5-flash';
+    let modelName = 'gemini-3.6-flash';
 
     if (apiKey.startsWith('gsk_')) {
       provider = 'groq';
