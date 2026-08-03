@@ -131,6 +131,9 @@ export async function POST(req: NextRequest) {
     }
 
     const sheetsPromise = (async () => {
+      const schemaCookieName = `docsync_schema_${profileId.replace(/-/g, '_')}`;
+      const schemaRaw = req.cookies.get(schemaCookieName)?.value;
+      const schemaKeys: string[] | null = schemaRaw ? JSON.parse(schemaRaw) : null;
       let spreadsheetId = explicitSpreadsheetId;
       const sheetName = profileId === 'ngo-receipt' ? 'NGO_Receipts' : 'Factory_Slips';
 
@@ -287,9 +290,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const schemaCookieName = `docsync_schema_${profileId.replace(/-/g, '_')}`;
-      const schemaRaw = req.cookies.get(schemaCookieName)?.value;
-      const schemaKeys: string[] | null = schemaRaw ? JSON.parse(schemaRaw) : null;
+
 
       const pkCookieName = `docsync_pk_${profileId.replace(/-/g, '_')}`;
       const pkRaw = req.cookies.get(pkCookieName)?.value;
