@@ -35,10 +35,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { UniversalAIAdapter } = await import('@/lib/UniversalAIAdapter');
-    
+
     let provider = 'google';
-    let modelName = 'gemini-2.5-flash';
-    
+    let modelName = 'gemini-3.5-flash';
+
     if (apiKey.startsWith('gsk_')) {
       provider = 'groq';
       modelName = 'llama-3.2-90b-vision-preview';
@@ -86,7 +86,7 @@ Return ONLY a JSON object with a single key "fields", which contains an array of
       prompt
     );
     let parsedData: Record<string, unknown> = {};
-    
+
     try {
       // Sometimes LLMs return markdown blocks even with json_object
       const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -109,7 +109,7 @@ Return ONLY a JSON object with a single key "fields", which contains an array of
     }
 
     if (!fieldsArray || fieldsArray.length === 0) {
-       return NextResponse.json({ fields: getStaticDefaults(profileId, extractedData) });
+      return NextResponse.json({ fields: getStaticDefaults(profileId, extractedData) });
     }
 
     return NextResponse.json({ fields: fieldsArray });

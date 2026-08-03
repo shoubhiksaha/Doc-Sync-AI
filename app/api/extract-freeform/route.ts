@@ -7,15 +7,68 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-function detectProviderAndModel(key: string) {
+type ProviderConfig = {
+  provider: string;
+  modelName: string;
+};
+
+type ProviderCandidate = ProviderConfig & {
+  apiKey: string;
+  source: string;
+};
+
+function detectProviderAndModel(key: string): ProviderConfig {
   if (key.startsWith('gsk_')) {
     return { provider: 'groq', modelName: 'llama-3.2-90b-vision-preview' };
   } else if (key.startsWith('sk-') || key.startsWith('proj-')) {
     return { provider: 'openai', modelName: 'gpt-4o' };
   } else {
     // Default to Gemini (starts with AIza... or AQ...)
-    return { provider: 'google', modelName: 'gemini-2.5-flash' };
+    return { provider: 'google', modelName: 'gemini-3.5-flash' };
   }
+}
+
+function buildProviderCandidates(customApiKey?: string): ProviderCandidate[] {
+  const rawCandidates = [
+    customApiKey ? { apiKey: customApiKey, source: 'saved key' } : null,
+    process.env.GROQ_API_KEY ? { apiKey: process.env.GROQ_API_KEY, source: 'GROQ_API_KEY' } : null,
+    process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY, source: 'OPENAI_API_KEY' } : null,
+    process.env.GEMINI_API_KEY ? { apiKey: process.env.GEMINI_API_KEY, source: 'GEMINI_API_KEY' } : null,
+  ].filter(Boolean) as { apiKey: string; source: string }[];
+
+  const seen = new Set<string>();
+  return rawCandidates.flatMap(({ apiKey, source }) => {
+    if (seen.has(apiKey)) return [];
+    seen.add(apiKey);
+    return [{ apiKey, source, ...detectProviderAndModel(apiKey) }];
+  });
+}
+
+function isRecoverableProviderError(message: string): boolean {
+  return /\b(408|409|429|5\d\d)\b/.test(message)
+    || message.includes('RESOURCE_EXHAUSTED')
+    || message.toLowerCase().includes('quota')
+    || message.toLowerCase().includes('rate limit')
+    || message.toLowerCase().includes('model not found');
+}
+
+function getMockExtraction(buffer: Buffer, imgBuffer: Buffer) {
+  return NextResponse.json({
+    success: true,
+    documentType: 'Mock Document',
+    fields: [
+      { key: 'date', label: 'Date', value: '24-Oct-2023', confidence: 95, category: 'date' },
+      { key: 'receiptNumber', label: 'Receipt Number', value: 'REC-2023-4521', confidence: 88, category: 'identity' },
+      { key: 'donorName', label: 'Donor Name', value: 'Rahul Sharma', confidence: 97, category: 'identity' },
+      { key: 'amount', label: 'Amount', value: '₹5,000', confidence: 99, category: 'financial' },
+      { key: 'paymentMode', label: 'Payment Mode', value: 'Cheque', confidence: 85, category: 'financial' },
+      { key: 'panNumber', label: 'PAN Number', value: 'ABCDE1234F', confidence: 91, category: 'identity' },
+      { key: 'ngoName', label: 'NGO Name', value: 'Help India Foundation', confidence: 96, category: 'identity' },
+      { key: 'section80g', label: 'Section 80G Ref', value: 'AAACH2345K/2023-24', confidence: 72, category: 'metadata' },
+    ],
+    stats: { originalSize: buffer.length, processedSize: imgBuffer.length },
+    isMock: true,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -53,35 +106,13 @@ export async function POST(req: NextRequest) {
 
     const { openaiKey } = await loadSettings(req);
     const customApiKey = req.headers.get('x-openai-key') || openaiKey;
-    const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+    const candidates = buildProviderCandidates(customApiKey);
 
     // If no API key — return mock data
-    if (!apiKey) {
-      return NextResponse.json({
-        success: true,
-        documentType: 'Mock Document',
-        fields: [
-          { key: 'date', label: 'Date', value: '24-Oct-2023', confidence: 95, category: 'date' },
-          { key: 'receiptNumber', label: 'Receipt Number', value: 'REC-2023-4521', confidence: 88, category: 'identity' },
-          { key: 'donorName', label: 'Donor Name', value: 'Rahul Sharma', confidence: 97, category: 'identity' },
-          { key: 'amount', label: 'Amount', value: '₹5,000', confidence: 99, category: 'financial' },
-          { key: 'paymentMode', label: 'Payment Mode', value: 'Cheque', confidence: 85, category: 'financial' },
-          { key: 'panNumber', label: 'PAN Number', value: 'ABCDE1234F', confidence: 91, category: 'identity' },
-          { key: 'ngoName', label: 'NGO Name', value: 'Help India Foundation', confidence: 96, category: 'identity' },
-          { key: 'section80g', label: 'Section 80G Ref', value: 'AAACH2345K/2023-24', confidence: 72, category: 'metadata' },
-        ],
-        stats: { originalSize: buffer.length, processedSize: imgBuffer.length },
-        isMock: true,
-      });
+    if (candidates.length === 0) {
+      return getMockExtraction(buffer, imgBuffer);
     }
 
-    const { provider, modelName } = detectProviderAndModel(apiKey);
-    const adapter = new UniversalAIAdapter({
-      apiKey: apiKey,
-      provider: provider,
-      modelName: modelName,
-    });
-    
     const base64Image = imgBuffer.toString('base64');
 
     // Build the system prompt — if user has saved a template, focus on those fields
@@ -121,13 +152,50 @@ Be exhaustive — capture everything:
 For confidence: 95+ = clearly printed, 75-94 = slightly unclear, 50-74 = partially visible, <50 = inferred.
 Return every field you can possibly identify.${focusPrompt}`;
 
-    const rawJsonString = await adapter.chat(
-      systemPrompt, 
-      `Extract ALL fields from this ${profileId} document. Be exhaustive.`, 
-      [{ mimeType: "image/jpeg", base64Data: base64Image }]
-    );
+    let parsed: { documentType?: string; fields?: unknown[]; totalFieldsVisible?: number } | null = null;
+    let lastError = 'No provider attempted extraction.';
 
-    const parsed = JSON.parse(rawJsonString);
+    for (const candidate of candidates) {
+      try {
+        const adapter = new UniversalAIAdapter({
+          apiKey: candidate.apiKey,
+          provider: candidate.provider,
+          modelName: candidate.modelName,
+        });
+
+        const rawJsonString = await adapter.chat(
+          systemPrompt,
+          `Extract ALL fields from this ${profileId} document. Be exhaustive.`,
+          [{ mimeType: "image/jpeg", base64Data: base64Image }]
+        );
+
+        parsed = JSON.parse(rawJsonString);
+        break;
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        lastError = msg;
+        console.warn(`Extraction failed with ${candidate.provider} (${candidate.source}):`, msg);
+
+        if (!isRecoverableProviderError(msg)) {
+          break;
+        }
+      }
+    }
+
+    if (!parsed || !Array.isArray(parsed.fields)) {
+      const quotaLike = isRecoverableProviderError(lastError);
+      if (quotaLike && process.env.DEMO_FALLBACK_ON_AI_QUOTA === 'true') {
+        const response = getMockExtraction(buffer, imgBuffer);
+        response.headers.set('x-docsync-ai-fallback', 'quota');
+        return response;
+      }
+
+      return NextResponse.json({
+        error: quotaLike
+          ? 'AI provider quota/rate limit reached. Add another provider key (Groq/OpenAI/Gemini) or wait for quota reset.'
+          : 'Extraction failed. Please check the configured AI provider key and model access.',
+      }, { status: quotaLike ? 429 : 500 });
+    }
 
     return NextResponse.json({
       success: true,

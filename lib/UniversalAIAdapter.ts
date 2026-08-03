@@ -33,12 +33,12 @@ export class UniversalAIAdapter {
 
         this.apiKey = config.apiKey;
         this.provider = (config.provider || 'openai').toLowerCase();
-        
+
         // Set default models per provider if not specified
         if (config.modelName) {
             this.modelName = config.modelName;
         } else if (this.provider === 'google') {
-            this.modelName = 'gemini-2.5-flash';
+            this.modelName = 'gemini-3.5-flash';
         } else if (this.provider === 'groq') {
             this.modelName = 'llama-3.2-90b-vision-preview';
         } else if (this.provider === 'anthropic') {
@@ -55,18 +55,18 @@ export class UniversalAIAdapter {
             this.baseUrl = config.baseUrl;
         } else {
             const urlMap: Record<string, string> = {
-                openai:      'https://api.openai.com/v1/chat/completions',
-                anthropic:   'https://api.anthropic.com/v1/messages',
-                google:      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.modelName)}:generateContent`,
-                cohere:      'https://api.cohere.ai/v2/chat',
+                openai: 'https://api.openai.com/v1/chat/completions',
+                anthropic: 'https://api.anthropic.com/v1/messages',
+                google: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.modelName)}:generateContent`,
+                cohere: 'https://api.cohere.ai/v2/chat',
                 huggingface: `https://api-inference.huggingface.co/models/${this.modelName}`,
-                xai:         'https://api.x.ai/v1/chat/completions',
-                groq:        'https://api.groq.com/openai/v1/chat/completions',
-                deepseek:    'https://api.deepseek.com/v1/chat/completions',
-                mistral:     'https://api.mistral.ai/v1/chat/completions',
-                perplexity:  'https://api.perplexity.ai/chat/completions',
-                together:    'https://api.together.xyz/v1/chat/completions',
-                openrouter:  'https://openrouter.ai/api/v1/chat/completions',
+                xai: 'https://api.x.ai/v1/chat/completions',
+                groq: 'https://api.groq.com/openai/v1/chat/completions',
+                deepseek: 'https://api.deepseek.com/v1/chat/completions',
+                mistral: 'https://api.mistral.ai/v1/chat/completions',
+                perplexity: 'https://api.perplexity.ai/chat/completions',
+                together: 'https://api.together.xyz/v1/chat/completions',
+                openrouter: 'https://openrouter.ai/api/v1/chat/completions',
             };
             this.baseUrl = urlMap[this.provider] || urlMap['openai'];
         }
@@ -104,7 +104,7 @@ export class UniversalAIAdapter {
     }
 
     async _chatOpenAICompatible(systemPrompt: string, userPrompt: string, images: VisionImage[]) {
-        const headers: Record<string, string> = { 
+        const headers: Record<string, string> = {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${this.apiKey}`
         };
@@ -137,7 +137,7 @@ export class UniversalAIAdapter {
         const data = await response.json();
         const content = data?.choices?.[0]?.message?.content;
         if (typeof content !== 'string') throw new Error('No extraction returned');
-        
+
         return stripMarkdownFences(content);
     }
 
@@ -148,8 +148,8 @@ export class UniversalAIAdapter {
         for (let i = 0; i < uniqueModels.length; i++) {
             const modelToTry = uniqueModels[i];
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelToTry)}:generateContent`;
-            
-            const headers: Record<string, string> = { 
+
+            const headers: Record<string, string> = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": this.apiKey
             };
@@ -192,10 +192,10 @@ export class UniversalAIAdapter {
                 if (i < uniqueModels.length - 1) continue;
                 throw new Error('No extraction returned');
             }
-            
+
             return stripMarkdownFences(text);
         }
-        
+
         return ''; // Unreachable due to the error thrown inside the loop
     }
 
@@ -237,7 +237,7 @@ export class UniversalAIAdapter {
         const data = await response.json();
         const rawText = data?.content?.[0]?.text;
         if (typeof rawText !== 'string') throw new Error('No extraction returned');
-        
+
         return stripMarkdownFences(rawText);
     }
 }
