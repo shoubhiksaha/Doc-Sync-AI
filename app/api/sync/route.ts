@@ -13,7 +13,7 @@ import { saveMediaLocallyForDemo } from '@/lib/demo-storage';
 
 export async function POST(req: NextRequest) {
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'mock_secret' });
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || '' });
     const accessToken = token?.accessToken as string | undefined;
 
     const formData = await req.formData();
@@ -30,6 +30,13 @@ export async function POST(req: NextRequest) {
 
     if (!data || !profileId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    if (documentFile && documentFile.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Document file size exceeds the 20MB limit.' }, { status: 413 });
+    }
+    if (audioFile && audioFile.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Audio file size exceeds the 10MB limit.' }, { status: 413 });
     }
 
     console.log(`Syncing data for ${profileId}... document attached: ${!!documentFile}`);
@@ -111,7 +118,7 @@ export async function POST(req: NextRequest) {
     // --- Google Sheets Sync ---
     // The user might have provided an explicit sheet ID, but we want to auto-create and manage one 
     // using drive.file scope if none works or none is provided.
-    const explicitSpreadsheetId = clientSheetId || process.env.GOOGLE_SHEET_ID;
+    const explicitSpreadsheetId = clientSheetId || (!accessToken ? process.env.GOOGLE_SHEET_ID : null);
 
     const sheetsPromise = (async () => {
       let spreadsheetId = explicitSpreadsheetId;
