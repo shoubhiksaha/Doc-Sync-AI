@@ -77,17 +77,20 @@ export async function POST(req: NextRequest) {
     let finalLinkToAudio: string | null = null;
     
     // --- Notion Sync ---
-    const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, archiveBuffer, finalNoteText, audioBuffer);
-    let notionResult;
+    let notionResult = { success: false, dummy: false, url: null as string | null };
     if (uploadDest === 'both' || uploadDest === 'notion') {
       try {
-        notionResult = await notionPromise;
+        if (profileId === 'ngo-receipt' || profileId === 'factory-weight-slip') {
+          const notionPromise = syncToNotion(data, profileId, notionKey, notionDbId, archiveBuffer, finalNoteText, audioBuffer);
+          notionResult = await notionPromise;
+        } else {
+          // Notion doesn't support freeform profiles yet in this codebase, fail gracefully
+          notionResult = { success: false, dummy: false, url: null };
+        }
       } catch (err) {
         console.error('Notion sync failed:', err);
         notionResult = { success: false, dummy: false, url: null };
       }
-    } else {
-      notionResult = { success: false, dummy: false, url: null };
     }
 
     // --- Google Drive / Local Storage Upload ---
@@ -367,9 +370,10 @@ export async function POST(req: NextRequest) {
 
       let rowValues: unknown[] = [];
       if (actualSchemaKeys) {
-        rowValues = actualSchemaKeys.map((key, idx) => {
+        rowValues = actualSchemaKeys.map((keyRaw, idx) => {
           let val: unknown = '';
-          const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const key = String(keyRaw || '');
+          const normalize = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
           const normKey = normalize(key);
 
           if (normKey === 'syncedat') val = new Date().toISOString();
