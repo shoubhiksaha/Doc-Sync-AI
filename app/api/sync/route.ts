@@ -231,9 +231,22 @@ export async function POST(req: NextRequest) {
                 console.error('Failed to move spreadsheet to folder:', err);
               }
             }
-            const headers = profileId === 'ngo-receipt' 
-              ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status']
-              : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
+            let headers: string[];
+            if (schemaKeys) {
+              headers = schemaKeys.map(k => {
+                if (k === 'synced_at') return 'Synced At';
+                if (k === 'sync_status') return 'Sync Status';
+                if (k === 'link_to_image') return 'Link to Image';
+                if (k === 'notes') return 'Notes (Text/Audio)';
+                if (k === 'voice_note_link') return 'Voice Note Audio Link';
+                const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+                return camel.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+              });
+            } else {
+              headers = profileId === 'ngo-receipt' 
+                ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status']
+                : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
+            }
             
             await sheets.spreadsheets.values.update({
               spreadsheetId,
@@ -377,9 +390,22 @@ export async function POST(req: NextRequest) {
           });
           
           const newSheetId = tabRes.data.replies?.[0].addSheet?.properties?.sheetId ?? 0;
-          const headers = profileId === 'ngo-receipt' 
-            ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status']
-            : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
+          let headers: string[];
+          if (schemaKeys) {
+            headers = schemaKeys.map(k => {
+              if (k === 'synced_at') return 'Synced At';
+              if (k === 'sync_status') return 'Sync Status';
+              if (k === 'link_to_image') return 'Link to Image';
+              if (k === 'notes') return 'Notes (Text/Audio)';
+              if (k === 'voice_note_link') return 'Voice Note Audio Link';
+              const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+              return camel.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+            });
+          } else {
+            headers = profileId === 'ngo-receipt' 
+              ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status']
+              : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
+          }
 
           // Add headers
           await sheets.spreadsheets.values.update({
