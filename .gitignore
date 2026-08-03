@@ -37,3 +37,7 @@ next-env.d.ts
 
 # sensitive keys
 keys/
+
+# next-pwa
+/public/sw.js
+/public/workbox-*.js

@@ -10,7 +10,7 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 export async function POST(req: NextRequest) {
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || 'mock_secret' });
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || '' });
     const googleAccessToken = token?.accessToken as string | undefined;
 
     const formData = await req.formData();
@@ -105,8 +105,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     console.error('Error processing document:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : '';
-    return NextResponse.json({ error: `An internal error occurred during document processing: ${errorMessage}`, stack: errorStack }, { status: 500 });
+    return NextResponse.json({ error: 'An internal error occurred during document processing' }, { status: 500 });
   }
 }

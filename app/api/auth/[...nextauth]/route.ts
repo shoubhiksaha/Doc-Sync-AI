@@ -36,8 +36,8 @@ async function refreshAccessToken(token: any) {
 const handler = NextAuth({
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "mock_client_id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "mock_client_secret",
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       authorization: {
         params: {
           prompt: "consent",
@@ -48,7 +48,7 @@ const handler = NextAuth({
       }
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET || 'fallback_secret_for_development',
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/login',
   },

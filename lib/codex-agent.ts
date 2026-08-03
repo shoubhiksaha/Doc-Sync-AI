@@ -1,5 +1,4 @@
-import { OpenAI } from "openai";
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { UniversalAIAdapter } from './UniversalAIAdapter';
 import { NgoReceiptSchema, FactoryWeightSlipSchema } from './schemas';
 import { z } from "zod";
 
@@ -9,114 +8,111 @@ export type AuditLog = {
   message: string;
 };
 
-// ---------------------------------------------------------------------------
-// Smart client factory: detects GitHub PAT and routes to GitHub Models endpoint
-// GitHub PATs start with 'ghp_' (classic) or 'github_pat_' (fine-grained)
-// Both work as drop-in replacements for an OpenAI API key — same SDK, same models.
-// ---------------------------------------------------------------------------
-function createOpenAIClient(customApiKey?: string) {
-  const apiKey = customApiKey || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN;
-
-  const isGitHubToken =
-    apiKey?.startsWith('ghp_') || apiKey?.startsWith('github_pat_');
-
-  return new OpenAI({
-    apiKey: apiKey || 'dummy_key',
-    // GitHub Models uses the Azure-backed inference endpoint.
-    // Setting baseURL to undefined falls through to the default OpenAI endpoint.
-    ...(isGitHubToken && { baseURL: 'https://models.inference.ai.azure.com' }),
-  });
+function detectProviderAndModel(key: string) {
+  if (key.startsWith('gsk_')) return { provider: 'groq', modelName: 'llama-3.2-90b-vision-preview' };
+  if (key.startsWith('sk-') || key.startsWith('proj-') || key.startsWith('ghp_') || key.startsWith('github_pat_')) return { provider: 'openai', modelName: 'gpt-4o' };
+  return { provider: 'google', modelName: 'gemini-3.6-flash' };
 }
 
-// ---------------------------------------------------------------------------
-// Codex 3-Stage Agentic Pipeline
-// ---------------------------------------------------------------------------
 export async function runCodexPipeline(
   imageBuffer: Buffer,
   profileId: string,
   customApiKey?: string
 ): Promise<{ data: unknown; auditLogs: AuditLog[] }> {
 
-  const resolvedKey = customApiKey || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN;
+  const resolvedKey = customApiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.GITHUB_TOKEN;
 
   // If no API key is available at all, return mock data immediately
   if (!resolvedKey) {
     console.warn("No API key set. Using mock extraction.");
     return {
       data: getMockData(profileId),
-      auditLogs: [{ stage: 'System', status: 'warning', message: 'Used mock data — no API key configured. Add OPENAI_API_KEY or GITHUB_TOKEN to .env.local' }],
+      auditLogs: [{ stage: 'System', status: 'warning', message: 'Used mock data — no API key configured. Add GEMINI_API_KEY or OPENAI_API_KEY to .env.local' }],
     };
   }
 
-  const openai = createOpenAIClient(customApiKey);
+  const { provider, modelName } = detectProviderAndModel(resolvedKey);
+  const adapter = new UniversalAIAdapter({ apiKey: resolvedKey, provider, modelName });
   const base64Image = imageBuffer.toString('base64');
   const auditLogs: AuditLog[] = [];
 
-  let schema;
+  let schemaString = "";
   let contextPrompt = "";
 
   if (profileId === 'ngo-receipt') {
-    schema = zodResponseFormat(NgoReceiptSchema, "ngo_receipt");
+    schemaString = `
+{
+  "date": "string (format: DD-MMM-YYYY)",
+  "donorName": "string",
+  "amount": "number",
+  "panNumber": "string (optional)"
+}`;
     contextPrompt = "Extract date, donor name, amount, and PAN number from the NGO donation receipt.";
   } else if (profileId === 'factory-weight-slip') {
-    schema = zodResponseFormat(FactoryWeightSlipSchema, "factory_weight_slip");
+    schemaString = `
+{
+  "date": "string (format: DD-MMM-YYYY)",
+  "vehicleNumber": "string",
+  "grossWeight": "number",
+  "tareWeight": "number"
+}`;
     contextPrompt = "Extract date, vehicle number, gross weight, and tare weight from the factory scrap weight slip.";
   } else {
     throw new Error('Unsupported profile ID');
   }
 
-  // --- STAGE 1: Fast Extraction (gpt-4o-mini) ---
-  auditLogs.push({ stage: 'Extraction', status: 'success', message: 'Initiated Stage 1: gpt-4o-mini fast extraction' });
+  const systemPrompt = `You are an expert document extraction AI. ${contextPrompt}
+Your ENTIRE response MUST be ONLY valid JSON matching this schema exactly:
+${schemaString}
+DO NOT wrap the response in markdown \`\`\`json. Return raw JSON.`;
+
+  // --- STAGE 1: Fast Extraction (Universal AI Adapter) ---
+  auditLogs.push({ stage: 'Extraction', status: 'success', message: `Initiated Stage 1: ${modelName} extraction` });
   let extractedData;
   try {
-    const response = await openai.chat.completions.parse({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: `You are an expert document extraction AI. ${contextPrompt}` },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Extract the data from this document image." },
-            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-          ]
-        }
-      ],
-      response_format: schema,
-      temperature: 0,
-    });
-    extractedData = response.choices[0].message.parsed;
+    const responseText = await adapter.chat(
+      systemPrompt, 
+      "Extract the data from this document image.", 
+      [{ mimeType: 'image/jpeg', base64Data: base64Image }]
+    );
+    const parsedJson = JSON.parse(responseText);
+    
+    // Validate with Zod
+    if (profileId === 'ngo-receipt') {
+      extractedData = NgoReceiptSchema.parse(parsedJson);
+    } else {
+      extractedData = FactoryWeightSlipSchema.parse(parsedJson);
+    }
+    
     auditLogs.push({ stage: 'Extraction', status: 'success', message: 'Stage 1 completed successfully.' });
-  } catch {
+  } catch (err) {
     auditLogs.push({ stage: 'Extraction', status: 'error', message: 'Stage 1 failed. Triggering Self-Healing fallback.' });
     extractedData = null;
   }
 
-  // --- STAGE 2: Self-Healing Fallback (gpt-4o) ---
+  // --- STAGE 2: Self-Healing Fallback ---
   if (!extractedData) {
-    auditLogs.push({ stage: 'Self-Healing', status: 'warning', message: 'Escalating to gpt-4o for complex document parsing.' });
+    auditLogs.push({ stage: 'Self-Healing', status: 'warning', message: `Escalating to deeper parsing.` });
     try {
-      const escalatedResponse = await openai.chat.completions.parse({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: `${contextPrompt} Be extremely precise, this is a fallback for difficult handwriting. Pay close attention to smudged text.` },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Extract the data from this document image." },
-              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-            ]
-          }
-        ],
-        response_format: schema,
-        temperature: 0,
-      });
-      extractedData = escalatedResponse.choices[0].message.parsed;
+      const fallbackPrompt = systemPrompt + " Be extremely precise, this is a fallback for difficult handwriting. Pay close attention to smudged text.";
+      const responseText = await adapter.chat(
+        fallbackPrompt, 
+        "Extract the data from this document image.", 
+        [{ mimeType: 'image/jpeg', base64Data: base64Image }]
+      );
+      const parsedJson = JSON.parse(responseText);
+      
+      if (profileId === 'ngo-receipt') {
+        extractedData = NgoReceiptSchema.parse(parsedJson);
+      } else {
+        extractedData = FactoryWeightSlipSchema.parse(parsedJson);
+      }
       auditLogs.push({ stage: 'Self-Healing', status: 'success', message: 'Stage 2 recovered data successfully.' });
     } catch (err: unknown) {
       auditLogs.push({ stage: 'Self-Healing', status: 'error', message: 'Stage 2 failed to recover data.' });
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('401')) {
-        throw new Error(`Invalid API Key. Please check your OpenAI/GitHub token in Settings.`);
+      if (msg.includes('401') || msg.includes('API Error')) {
+        throw new Error(`Invalid API Key. Please check your token in Settings.`);
       }
       throw new Error(`Codex Pipeline failed to extract document data. Inner error: ${msg}`);
     }

@@ -8,8 +8,13 @@ export function middleware(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login');
   const isApiRoute = request.nextUrl.pathname.startsWith('/api');
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth');
 
-  if (!token && !isGuest && !isLoginPage && !isApiRoute) {
+  // Allow access to auth routes, otherwise check for token/guest for API and UI
+  if (!token && !isGuest && !isLoginPage && (!isApiRoute || (isApiRoute && !isAuthRoute))) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: 'Unauthorized. Please login or use demo mode.' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

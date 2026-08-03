@@ -1,13 +1,9 @@
-// ─── Mock the OpenAI SDK before any imports ───────────────────────────────────
-const mockParse = jest.fn();
-jest.mock('openai', () => {
+// ─── Mock UniversalAIAdapter before any imports ───────────────────────────────────
+const mockChat = jest.fn();
+jest.mock('../../lib/UniversalAIAdapter', () => {
   return {
-    OpenAI: jest.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          parse: mockParse,
-        },
-      },
+    UniversalAIAdapter: jest.fn().mockImplementation(() => ({
+      chat: mockChat,
     })),
   };
 });
@@ -27,10 +23,8 @@ const TINY_JPEG = Buffer.from(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeOpenAIResponse(parsed: unknown) {
-  return {
-    choices: [{ message: { parsed } }],
-  };
+function makeAdapterResponse(parsedObj: unknown) {
+  mockChat.mockResolvedValueOnce(JSON.stringify(parsedObj));
 }
 
 // ─── runCodexPipeline – No API key ────────────────────────────────────────────
@@ -43,7 +37,8 @@ describe('runCodexPipeline – no API key', () => {
     process.env = { ...OLD_ENV };
     delete process.env.OPENAI_API_KEY;
     delete process.env.GITHUB_TOKEN;
-    mockParse.mockReset();
+    delete process.env.GEMINI_API_KEY;
+    mockChat.mockReset();
   });
 
   afterAll(() => {
@@ -60,152 +55,199 @@ describe('runCodexPipeline – no API key', () => {
   test('returns mock data when no key is configured (factory-weight-slip)', async () => {
     const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', undefined);
     expect(auditLogs[0].status).toBe('warning');
+    expect(auditLogs[0].message).toMatch(/no API key/i);
     expect((data as Record<string, unknown>).vehicleNumber).toBe('MH-12-AB-1234');
   });
 });
 
-// ─── runCodexPipeline – Stage 1 success ───────────────────────────────────────
+// ─── runCodexPipeline – With API key ──────────────────────────────────────────
 
-describe('runCodexPipeline – Stage 1 success', () => {
+describe('runCodexPipeline – with API key', () => {
+  const OLD_ENV = process.env;
+
   beforeEach(() => {
-    mockParse.mockReset();
+    jest.resetModules();
+    process.env = { ...OLD_ENV };
+    process.env.OPENAI_API_KEY = 'test-key';
+    mockChat.mockReset();
   });
 
-  test('ngo-receipt: Stage 1 succeeds → returns extracted data + audit logs', async () => {
-    const ngoData = { date: '2023-10-01', donorName: 'Priya K', amount: 1000, panNumber: 'ABCDE1234F' };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
-
-    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake-key');
-
-    expect(data).toEqual(ngoData);
-    expect(auditLogs.some(l => l.stage === 'Extraction' && l.status === 'success')).toBe(true);
-    expect(mockParse).toHaveBeenCalledTimes(1);
+  afterAll(() => {
+    process.env = OLD_ENV;
   });
 
-  test('factory-weight-slip: Stage 1 succeeds → correct data', async () => {
-    const fwData = { date: '2023-10-01', vehicleNumber: 'GJ-01-ZZ-1234', grossWeight: 20000, tareWeight: 6000 };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(fwData));
+  test('Stage 1 Success: extracts valid ngo-receipt data on first try', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      donorName: 'John Doe',
+      amount: 1500,
+      panNumber: 'ABCDE1234F',
+    });
 
-    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', 'sk-fake-key');
+    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined);
 
-    expect(data).toEqual(fwData);
-    expect(mockParse).toHaveBeenCalledTimes(1);
-    expect(auditLogs.some(l => l.stage === 'Validation' && l.status === 'success')).toBe(true);
+    // Verify chat was called
+    expect(mockChat).toHaveBeenCalledTimes(1);
+
+    // Verify valid data returned
+    expect(data).toMatchObject({
+      date: '2023-10-24',
+      donorName: 'John Doe',
+      amount: 1500,
+      panNumber: 'ABCDE1234F',
+    });
+
+    // Check audit logs
+    const stages = auditLogs.map(log => log.stage);
+    expect(stages).toEqual(['Extraction', 'Extraction', 'Validation', 'Validation']);
+    expect(auditLogs[0].status).toBe('success');
+    expect(auditLogs[1].status).toBe('success');
   });
 
-  test('uses GitHub Models endpoint when key starts with ghp_', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'A', amount: 100 };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
+  test('Stage 1 Success: extracts valid factory-weight-slip data', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      vehicleNumber: 'MH-12-3456',
+      grossWeight: 10000,
+      tareWeight: 4000,
+    });
 
-    await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'ghp_testtoken12345');
-    expect(mockParse).toHaveBeenCalledTimes(1);
+    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', undefined);
+
+    expect(data).toMatchObject({
+      vehicleNumber: 'MH-12-3456',
+      grossWeight: 10000,
+      tareWeight: 4000,
+    });
+    expect(auditLogs.some(log => log.stage === 'Self-Healing')).toBe(false);
   });
 
-  test('uses GitHub Models endpoint when key starts with github_pat_', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'B', amount: 200 };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
+  test('Stage 2 Fallback: recovers when Stage 1 fails', async () => {
+    // Make first call throw, second call succeed
+    mockChat
+      .mockRejectedValueOnce(new Error('Stage 1 parsing error'))
+      .mockResolvedValueOnce(JSON.stringify({
+        date: '2023-10-24',
+        donorName: 'Recovered Name',
+        amount: 500,
+        panNumber: 'RECOV1234F',
+      }));
 
-    await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'github_pat_longtoken12345');
-    expect(mockParse).toHaveBeenCalledTimes(1);
+    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined);
+
+    expect(mockChat).toHaveBeenCalledTimes(2);
+
+    expect(data).toMatchObject({
+      donorName: 'Recovered Name',
+      amount: 500,
+    });
+
+    // We should see a failure for Extraction, and success for Self-Healing
+    const extractionFail = auditLogs.find(l => l.stage === 'Extraction' && l.status === 'error');
+    const healingSuccess = auditLogs.find(l => l.stage === 'Self-Healing' && l.status === 'success');
+
+    expect(extractionFail).toBeDefined();
+    expect(healingSuccess).toBeDefined();
+  });
+
+  test('Stage 2 Fallback: throws error if both stages fail', async () => {
+    mockChat
+      .mockRejectedValueOnce(new Error('Stage 1 error'))
+      .mockRejectedValueOnce(new Error('Stage 2 error'));
+
+    await expect(runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined))
+      .rejects.toThrow(/Codex Pipeline failed to extract document data/);
+
+    expect(mockChat).toHaveBeenCalledTimes(2);
+  });
+
+  test('Throws specific 401 Invalid API Key error', async () => {
+    mockChat
+      .mockRejectedValueOnce(new Error('Stage 1 error'))
+      .mockRejectedValueOnce(new Error('401 Unauthorized'));
+
+    await expect(runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined))
+      .rejects.toThrow(/Invalid API Key/);
+  });
+
+  test('Unsupported profile ID throws error immediately', async () => {
+    await expect(runCodexPipeline(TINY_JPEG, 'invalid-profile', undefined))
+      .rejects.toThrow('Unsupported profile ID');
+    expect(mockChat).not.toHaveBeenCalled();
   });
 });
 
-// ─── runCodexPipeline – Self-Healing (Stage 2) ────────────────────────────────
+// ─── runCodexPipeline – Validation Logic ──────────────────────────────────────
 
-describe('runCodexPipeline – Self-Healing fallback', () => {
-  beforeEach(() => mockParse.mockReset());
+describe('runCodexPipeline – Validation Stage', () => {
+  const OLD_ENV = process.env;
 
-  test('escalates to Stage 2 when Stage 1 throws', async () => {
-    const fwData = { date: '2023-01-01', vehicleNumber: 'MH-04-AB-9999', grossWeight: 10000, tareWeight: 3000 };
-    mockParse
-      .mockRejectedValueOnce(new Error('Rate limited'))  // Stage 1 fails
-      .mockResolvedValueOnce(makeOpenAIResponse(fwData)); // Stage 2 succeeds
-
-    const { data, auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', 'sk-fake');
-
-    expect(data).toEqual(fwData);
-    expect(mockParse).toHaveBeenCalledTimes(2);
-    expect(auditLogs.some(l => l.stage === 'Self-Healing' && l.status === 'success')).toBe(true);
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...OLD_ENV };
+    process.env.OPENAI_API_KEY = 'test-key';
+    mockChat.mockReset();
   });
 
-  test('throws final error when both Stage 1 and Stage 2 fail', async () => {
-    mockParse
-      .mockRejectedValueOnce(new Error('Model error'))
-      .mockRejectedValueOnce(new Error('Still failing'));
-
-    await expect(runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake')).rejects.toThrow(
-      'Codex Pipeline failed to extract document data.'
-    );
-    expect(mockParse).toHaveBeenCalledTimes(2);
+  afterAll(() => {
+    process.env = OLD_ENV;
   });
 
-  test('self-healing audit log contains error for stage 1 and warning for stage 2 escalation', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'Test', amount: 500 };
-    mockParse
-      .mockRejectedValueOnce(new Error('fail'))
-      .mockResolvedValueOnce(makeOpenAIResponse(ngoData));
+  test('ngo-receipt: throws warning if amount > 2000 and no PAN', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      donorName: 'Anonymous',
+      amount: 2500, // > 2000
+      panNumber: '', // Missing
+    });
 
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake');
-
-    expect(auditLogs.some(l => l.stage === 'Extraction' && l.status === 'error')).toBe(true);
-    expect(auditLogs.some(l => l.stage === 'Self-Healing' && l.status === 'warning')).toBe(true);
-    expect(auditLogs.some(l => l.stage === 'Self-Healing' && l.status === 'success')).toBe(true);
-  });
-});
-
-// ─── runCodexPipeline – Stage 3 Validation ───────────────────────────────────
-
-describe('runCodexPipeline – Stage 3 Validation', () => {
-  beforeEach(() => mockParse.mockReset());
-
-  test('factory: warns when tare >= gross weight', async () => {
-    const fwData = { date: '2023-01-01', vehicleNumber: 'MH-01-XX-0001', grossWeight: 5000, tareWeight: 5000 };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(fwData));
-
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', 'sk-fake');
-    expect(auditLogs.some(l => l.stage === 'Validation' && l.status === 'warning')).toBe(true);
-    expect(auditLogs.find(l => l.stage === 'Validation' && l.status === 'warning')?.message).toMatch(/Tare.*>=/);
+    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined);
+    
+    const validationLog = auditLogs.find(l => l.stage === 'Validation' && l.status === 'warning');
+    expect(validationLog).toBeDefined();
+    expect(validationLog?.message).toMatch(/PAN legally required/i);
   });
 
-  test('factory: passes when tare < gross weight', async () => {
-    const fwData = { date: '2023-01-01', vehicleNumber: 'MH-01-XX-0002', grossWeight: 15000, tareWeight: 5000 };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(fwData));
+  test('ngo-receipt: passes if amount > 2000 and PAN is provided', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      donorName: 'Anonymous',
+      amount: 2500,
+      panNumber: 'ABCDE1234F',
+    });
 
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', 'sk-fake');
-    const validationLogs = auditLogs.filter(l => l.stage === 'Validation');
-    expect(validationLogs.every(l => l.status === 'success')).toBe(true);
+    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', undefined);
+    
+    const validationSuccess = auditLogs.find(l => l.stage === 'Validation' && l.status === 'success' && l.message.includes('passed'));
+    expect(validationSuccess).toBeDefined();
   });
 
-  test('ngo: warns when amount > 2000 and PAN is missing', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'Big Donor', amount: 5000, panNumber: '' };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
+  test('factory-weight-slip: throws warning if tare >= gross', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      vehicleNumber: 'MH-12-3456',
+      grossWeight: 5000,
+      tareWeight: 6000, // Invalid: Tare > Gross
+    });
 
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake');
-    expect(auditLogs.some(l => l.stage === 'Validation' && l.status === 'warning')).toBe(true);
-    expect(auditLogs.find(l => l.stage === 'Validation' && l.status === 'warning')?.message).toMatch(/PAN legally required/);
+    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', undefined);
+    
+    const validationLog = auditLogs.find(l => l.stage === 'Validation' && l.status === 'warning');
+    expect(validationLog).toBeDefined();
+    expect(validationLog?.message).toMatch(/Logical inconsistency/i);
   });
 
-  test('ngo: passes compliance when amount <= 2000 with no PAN', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'Small Donor', amount: 500, panNumber: '' };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
+  test('factory-weight-slip: passes if tare < gross', async () => {
+    makeAdapterResponse({
+      date: '2023-10-24',
+      vehicleNumber: 'MH-12-3456',
+      grossWeight: 10000,
+      tareWeight: 4000,
+    });
 
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake');
-    const validationLogs = auditLogs.filter(l => l.stage === 'Validation');
-    expect(validationLogs.every(l => l.status === 'success')).toBe(true);
-  });
-
-  test('ngo: passes compliance when amount > 2000 and PAN is present', async () => {
-    const ngoData = { date: '2023-01-01', donorName: 'Legal Donor', amount: 10000, panNumber: 'ABCDE1234F' };
-    mockParse.mockResolvedValueOnce(makeOpenAIResponse(ngoData));
-
-    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'ngo-receipt', 'sk-fake');
-    const validationLogs = auditLogs.filter(l => l.stage === 'Validation');
-    expect(validationLogs.every(l => l.status === 'success')).toBe(true);
-  });
-
-  test('unsupported profileId throws error', async () => {
-    await expect(
-      runCodexPipeline(TINY_JPEG, 'unsupported-profile', 'sk-fake')
-    ).rejects.toThrow('Unsupported profile ID');
+    const { auditLogs } = await runCodexPipeline(TINY_JPEG, 'factory-weight-slip', undefined);
+    
+    const validationSuccess = auditLogs.find(l => l.stage === 'Validation' && l.status === 'success' && l.message.includes('passed'));
+    expect(validationSuccess).toBeDefined();
   });
 });

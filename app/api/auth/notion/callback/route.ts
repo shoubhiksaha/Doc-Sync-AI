@@ -13,6 +13,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/?notionError=no_code', req.url));
   }
 
+  const state = req.nextUrl.searchParams.get('state');
+  const storedState = req.cookies.get('notion_oauth_state')?.value;
+  
+  if (!state || state !== storedState) {
+    return NextResponse.redirect(new URL('/?notionError=invalid_state', req.url));
+  }
+
   const clientId = process.env.NOTION_CLIENT_ID;
   const clientSecret = process.env.NOTION_CLIENT_SECRET;
 
@@ -21,9 +28,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Determine original host
-  const host = req.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const redirectUri = `${protocol}://${host}/api/auth/notion/callback`;
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const redirectUri = `${baseUrl}/api/auth/notion/callback`;
 
   // Exchange code for Notion access token
   const encodedCredentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');

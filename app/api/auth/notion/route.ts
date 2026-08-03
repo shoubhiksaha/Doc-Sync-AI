@@ -1,19 +1,20 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const clientId = process.env.NOTION_CLIENT_ID;
   if (!clientId) {
     return NextResponse.json({ error: 'Notion integration not configured' }, { status: 500 });
   }
   
-  // Base URL from the request, fallback to env variable or localhost
-  const host = req.headers.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const redirectUri = encodeURIComponent(`${protocol}://${host}/api/auth/notion/callback`);
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const redirectUri = encodeURIComponent(`${baseUrl}/api/auth/notion/callback`);
+  const state = crypto.randomUUID();
   
   // Notion OAuth Authorization URL
-  const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${clientId}&response_type=code&owner=user&redirect_uri=${redirectUri}`;
+  const notionAuthUrl = `https://api.notion.com/v1/oauth/authorize?client_id=${clientId}&response_type=code&owner=user&redirect_uri=${redirectUri}&state=${state}`;
   
   // Redirect user to Notion's consent screen
-  return NextResponse.redirect(notionAuthUrl);
+  const response = NextResponse.redirect(notionAuthUrl);
+  response.cookies.set('notion_oauth_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
+  return response;
 }

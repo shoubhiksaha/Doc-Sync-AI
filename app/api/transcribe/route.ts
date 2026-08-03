@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
     
+    if (audioFile.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Audio file too large (max 10MB)' }, { status: 413 });
+    }
+    if (!audioFile.type.startsWith('audio/') && !audioFile.type.startsWith('video/')) {
+      return NextResponse.json({ error: 'Invalid file type. Only audio files are allowed.' }, { status: 400 });
+    }
+    
     const { openaiKey } = await loadSettings(req);
     const resolvedKey = req.headers.get('x-openai-key') || openaiKey;
 
