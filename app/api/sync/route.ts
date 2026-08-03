@@ -378,8 +378,8 @@ export async function POST(req: NextRequest) {
           
           const newSheetId = tabRes.data.replies?.[0].addSheet?.properties?.sheetId ?? 0;
           const headers = profileId === 'ngo-receipt' 
-            ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Link to Image', 'Notes', 'Voice Note Link', 'Synced At', 'Sync Status']
-            : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Link to Image', 'Notes', 'Voice Note Link', 'Synced At', 'Sync Status'];
+            ? ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status']
+            : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
 
           // Add headers
           await sheets.spreadsheets.values.update({
