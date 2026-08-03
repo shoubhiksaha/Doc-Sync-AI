@@ -30,10 +30,10 @@ function detectProviderAndModel(key: string): ProviderConfig {
 
 function buildProviderCandidates(customApiKey?: string): ProviderCandidate[] {
   const rawCandidates = [
-    customApiKey ? { apiKey: customApiKey, source: 'saved key' } : null,
-    process.env.GROQ_API_KEY ? { apiKey: process.env.GROQ_API_KEY, source: 'GROQ_API_KEY' } : null,
-    process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY, source: 'OPENAI_API_KEY' } : null,
-    process.env.GEMINI_API_KEY ? { apiKey: process.env.GEMINI_API_KEY, source: 'GEMINI_API_KEY' } : null,
+    customApiKey ? { apiKey: customApiKey.trim(), source: 'saved key' } : null,
+    process.env.GROQ_API_KEY ? { apiKey: process.env.GROQ_API_KEY.trim(), source: 'GROQ_API_KEY' } : null,
+    process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY.trim(), source: 'OPENAI_API_KEY' } : null,
+    process.env.GEMINI_API_KEY ? { apiKey: process.env.GEMINI_API_KEY.trim(), source: 'GEMINI_API_KEY' } : null,
   ].filter(Boolean) as { apiKey: string; source: string }[];
 
   const seen = new Set<string>();
@@ -193,7 +193,7 @@ Return every field you can possibly identify.${focusPrompt}`;
       return NextResponse.json({
         error: quotaLike
           ? 'AI provider quota/rate limit reached. Add another provider key (Groq/OpenAI/Gemini) or wait for quota reset.'
-          : 'Extraction failed. Please check the configured AI provider key and model access.',
+          : `Extraction failed. Please check the configured AI provider key and model access. (Details: ${lastError})`,
       }, { status: quotaLike ? 429 : 500 });
     }
 
