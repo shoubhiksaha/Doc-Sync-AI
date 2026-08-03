@@ -403,30 +403,8 @@ export default function ScanPage() {
     if (!fieldsToSync) return;
     const existingSheetId = getSheetIdFromCookie() || spreadsheetId;
 
-    if (existingSheetId) {
-      await doSync(fieldsToSync, existingSheetId);
-    } else {
-      setPendingSyncFields(fieldsToSync);
-      const toastId = toast.loading('AI is designing your Google Sheet columns...');
-      try {
-        const res = await fetch('/api/sheets/suggest-schema', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ extractedData: Object.fromEntries(fieldsToSync.map(f => [f.key, f.value])), profileId }),
-        });
-        const result = await res.json();
-        if (res.ok && result.fields?.length) {
-          setSuggestedFields(result.fields);
-          setShowSheetModal(true);
-          toast.dismiss(toastId);
-        } else {
-          throw new Error(result.error || 'No fields returned');
-        }
-      } catch {
-        toast.error('Could not generate schema. Using default columns.', { id: toastId });
-        await doSync(fieldsToSync, null);
-      }
-    }
+    // Directly sync! The backend will dynamically generate or expand the Google Sheet columns.
+    await doSync(fieldsToSync, existingSheetId || null);
   };
 
   const handleModalConfirm = async (cols: SheetColumn[], newSheetId: string, newSheetUrl: string) => {
