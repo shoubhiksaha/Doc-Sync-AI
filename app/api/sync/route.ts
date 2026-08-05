@@ -165,7 +165,11 @@ export async function POST(req: NextRequest) {
       const drive = google.drive({ version: 'v3', auth: authClient as never });
       const sheets = google.sheets({ version: 'v4', auth: authClient as never });
 
-      // If no explicit ID, find or create "DocSync AI Data"
+      // If no explicit ID, use GOOGLE_SHEET_ID or find/create "DocSync AI Data"
+      if (!spreadsheetId && !accessToken && process.env.GOOGLE_SHEET_ID) {
+        spreadsheetId = process.env.GOOGLE_SHEET_ID;
+      }
+
       if (!spreadsheetId) {
         try {
           const res = await drive.files.list({
@@ -174,10 +178,13 @@ export async function POST(req: NextRequest) {
             fields: 'files(id, name)',
           });
           
+          let sheetId = 0;
           if ((res.data as any).files && (res.data as any).files.length > 0) {
             spreadsheetId = (res.data as any).files[0].id as string;
+            const existingData = await sheets.spreadsheets.get({ spreadsheetId });
+            const existingSheet = existingData.data.sheets?.find(s => s.properties?.title === sheetName);
+            sheetId = existingSheet?.properties?.sheetId ?? 0;
           } else {
-            let sheetId = 0;
             // Create it
             if (!accessToken && process.env.GOOGLE_SHARED_FOLDER_ID) {
               const driveRes = await drive.files.create({
@@ -261,12 +268,46 @@ export async function POST(req: NextRequest) {
                 : ['Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Notes (Text/Audio)', 'Voice Note Audio Link', 'Link to Image', 'Synced At', 'Sync Status'];
             }
             
-            await sheets.spreadsheets.values.update({
-              spreadsheetId,
-              range: `${sheetName}!A1`,
-              valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [headers] },
-            });
+            try {
+              await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${sheetName}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: [headers] },
+              });
+            } catch (err: any) {
+              if (err.message && err.message.includes('Unable to parse range')) {
+                // Tab doesn't exist, let's create it
+                await sheets.spreadsheets.batchUpdate({
+                  spreadsheetId,
+                  requestBody: {
+                    requests: [
+                      {
+                        addSheet: {
+                          properties: { title: sheetName, gridProperties: { frozenRowCount: 1 } }
+                        }
+                      }
+                    ]
+                  }
+                });
+                // Fetch new sheetId
+                const freshData = await sheets.spreadsheets.get({ spreadsheetId });
+                const newSheet = freshData.data.sheets?.find(s => s.properties?.title === sheetName);
+                if (newSheet && newSheet.properties?.sheetId !== undefined) {
+                  sheetId = newSheet.properties.sheetId;
+                }
+                
+                // Retry update
+                await sheets.spreadsheets.values.update({
+                  spreadsheetId,
+                  range: `${sheetName}!A1`,
+                  valueInputOption: 'USER_ENTERED',
+                  requestBody: { values: [headers] },
+                });
+              } else {
+                throw err;
+              }
+            }
 
             await sheets.spreadsheets.batchUpdate({
               spreadsheetId,
@@ -294,9 +335,9 @@ export async function POST(req: NextRequest) {
               },
             });
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Error finding/creating DocSync AI Data spreadsheet:", err);
-          throw err; // Fail the sync
+          throw new Error(`Could not initialize Google Sheets connection: ${err.message || String(err)}`);
         }
       }
 
