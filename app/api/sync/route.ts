@@ -293,7 +293,7 @@ export async function POST(req: NextRequest) {
                 // Fetch new sheetId
                 const freshData = await sheets.spreadsheets.get({ spreadsheetId });
                 const newSheet = freshData.data.sheets?.find(s => s.properties?.title === sheetName);
-                if (newSheet && newSheet.properties?.sheetId !== undefined) {
+                if (newSheet && newSheet.properties?.sheetId != null) {
                   sheetId = newSheet.properties.sheetId;
                 }
                 
