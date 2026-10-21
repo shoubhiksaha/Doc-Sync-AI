@@ -172,7 +172,7 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
     }
     const fields = normalizeFields(parsed.fields);
     if (fields.length === 0) {
-      throw new ExtractionUnavailableError('No details could be read from this document. Try a clearer, well-lit photo.', false);
+      throw new ExtractionUnavailableError('No details could be read from this document. Try a clearer, well-lit photo.', false, 'input');
     }
 
     return {

@@ -140,7 +140,7 @@ export class UniversalAIAdapter {
     }
 
     async _chatGoogle(systemPrompt: string, userPrompt: string, images: VisionImage[]) {
-        const modelsToTry = [this.modelName, 'gemini-3-flash-preview', 'gemini-2.5-flash-image'];
+        const modelsToTry = [this.modelName, 'gemini-3-flash-preview', 'gemini-2.5-flash'];
         const uniqueModels = Array.from(new Set(modelsToTry));
 
         for (let i = 0; i < uniqueModels.length; i++) {

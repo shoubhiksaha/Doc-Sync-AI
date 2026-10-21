@@ -47,8 +47,11 @@ test.describe('UX (local, mock mode)', () => {
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+    // Real documents have long values; they must wrap rather than be cut off.
+    await page.getByLabel('NGO Name', { exact: true }).fill('Shree Mahalakshmi Gramin Vikas Evam Shiksha Seva Trust, Kolhapur');
     const clipped = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLInputElement>('main input:not([type=file])')].filter((i) => i.offsetWidth && i.scrollWidth > i.clientWidth + 1).length,
+      [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('main input:not([type=file]), main textarea')]
+        .filter((i) => i.offsetWidth && (i.scrollWidth > i.clientWidth + 1 || i.scrollHeight > i.clientHeight + 1)).length,
     );
     expect(clipped).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);

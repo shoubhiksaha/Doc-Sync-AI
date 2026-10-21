@@ -110,7 +110,7 @@ export const en = {
   'error.too_large': 'The file is too large. Try a smaller photo (under 20 MB).',
   'error.demo_budget': "The demo has used today's AI allowance. Try again tomorrow, add your own free AI key in Settings, or sign in.",
   'error.quota': 'The AI service is busy. Wait a minute and try again, or add your own free AI key in Settings.',
-  'error.unavailable': "The AI couldn't read this document. Try a sharper photo in better light.",
+  'error.unavailable': "The service didn't respond. Wait a minute and try again.",
   'error.rate_limited': "You're going a bit fast. Wait a few minutes and try again.",
   'error.network': 'No connection. Check your internet and try again.',
   'error.session': 'Your session has ended. Please sign in again.',

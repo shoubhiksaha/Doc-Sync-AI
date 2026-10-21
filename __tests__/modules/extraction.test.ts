@@ -65,6 +65,12 @@ describe('modules/extraction', () => {
     await expect(extractFields({ document: image, profile: ngo })).rejects.toThrow(ExtractionUnavailableError);
   });
 
+  it('treats a photo with nothing readable as an input problem, not a service outage', async () => {
+    process.env.OPENAI_API_KEY = 'sk-x';
+    (global.fetch as jest.Mock).mockResolvedValue(modelReply({ fields: [] }));
+    await expect(extractFields({ document: image, profile: ngo })).rejects.toMatchObject({ kind: 'input', message: expect.stringMatching(/clearer/) });
+  });
+
   it('maps all-providers-out-of-quota to a quota error, or to mock data when the demo fallback is on', async () => {
     process.env.OPENAI_API_KEY = 'sk-x';
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429, text: async () => 'quota' });

@@ -28,7 +28,7 @@ describe('UniversalAIAdapter', () => {
     expect(googleAdapter.modelName).toBe('gemini-3.6-flash');
 
     const groqAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'groq' });
-    expect(groqAdapter.modelName).toBe('meta-llama/llama-4-scout-17b-16e-instruct');
+    expect(groqAdapter.modelName).toBe('qwen/qwen3.8-27b');
 
     const anthropicAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'anthropic' });
     expect(anthropicAdapter.modelName).toBe('claude-sonnet-5-5');
