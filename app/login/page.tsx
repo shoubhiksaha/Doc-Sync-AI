@@ -1,48 +1,80 @@
 'use client';
+import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { Languages } from 'lucide-react';
+import { useI18n } from '@/client/i18n/I18nProvider';
+import { track } from '@/client/telemetry';
+import { Button, Notice } from '../components/ui';
+import styles from './login.module.css';
+
+/** Google's multi-colour "G" mark, as required by the Sign in with Google branding guidelines. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t, lang, setLang } = useI18n();
+  const [demoError, setDemoError] = useState(false);
+  const [startingDemo, setStartingDemo] = useState(false);
+  const other = lang === 'en' ? 'hi' : 'en';
 
-  const handleDemoLogin = () => {
-    document.cookie = "docsync_guest=true; path=/; max-age=86400"; // 1 day
-    router.push('/');
+  const startDemo = async () => {
+    setStartingDemo(true);
+    setDemoError(false);
+    try {
+      const res = await fetch('/api/auth/guest', { method: 'POST' });
+      if (!res.ok) throw new Error(String(res.status));
+      track('demo_started');
+      router.push('/');
+      router.refresh();
+    } catch {
+      setDemoError(true);
+      setStartingDemo(false);
+    }
   };
 
   return (
-    <main className="container animate-fade-in" style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', maxWidth: '400px', width: '100%' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>DocSync AI</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-          Sign in to connect your Google Drive & Sheets securely.
-        </p>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <button 
-            onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="btn btn-primary"
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1.1rem' }}
-          >
-            <span>🌐</span> Sign in with Google
-          </button>
+    <main id="main" className={styles.page}>
+      <button type="button" className={styles.language} onClick={() => setLang(other)} aria-label={t('nav.switchLanguageLabel')}>
+        <Languages size={20} aria-hidden />
+        <span lang={other}>{t('nav.switchLanguage')}</span>
+      </button>
 
-          <button 
-            onClick={handleDemoLogin}
-            className="btn btn-secondary"
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1rem', opacity: 0.8 }}
-          >
-            Try Demo Mode (No Login)
+      <div className={styles.card}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny static SVG logo */}
+        <img src="/icon.svg" alt="" width={56} height={56} className={styles.logo} />
+        <h1 className={styles.title}>DocSync AI</h1>
+        <p className={styles.tagline}>{t('login.tagline')}</p>
+
+        <div className={styles.buttons}>
+          <button type="button" className={styles.google} onClick={() => signIn('google', { callbackUrl: '/' })}>
+            <GoogleMark />
+            {t('login.google')}
           </button>
-          
-          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'left' }}>
-            <strong>💡 How it works:</strong>
-            <ul style={{ paddingLeft: '1.25rem', marginTop: '0.5rem', marginBottom: 0 }}>
-              <li><strong>Demo Mode:</strong> Uses a single global Google Sheet and free public media hosting (Catbox.moe) so judges can test instantly without logging in.</li>
-              <li style={{ marginTop: '0.25rem' }}><strong>Google Login:</strong> Creates private spreadsheets and securely uploads media directly to your personal Google Drive.</li>
-            </ul>
-          </div>
+          <Button size="lg" fullWidth wrap loading={startingDemo} onClick={startDemo}>
+            {startingDemo ? t('login.demoStarting') : t('login.demo')}
+          </Button>
+          {demoError && <Notice tone="danger" urgent>{t('login.demoUnavailable')}</Notice>}
         </div>
+
+        <details className={styles.compare}>
+          <summary>{t('login.compareTitle')}</summary>
+          <ul>
+            <li>{t('login.compareGoogle')}</li>
+            <li>{t('login.compareDemo')}</li>
+          </ul>
+        </details>
+
+        <p className={styles.footer}>{t('home.footer')}</p>
       </div>
     </main>
   );

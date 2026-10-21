@@ -14,15 +14,16 @@
 
 ## Slide 3: The Solution
 * **DocSync AI** allows workers to snap a photo of any physical document using a mobile PWA.
-* **AI Extraction:** Instantly extracts structured JSON using gpt-4o (Vision) and gpt-4o-mini.
-* **Human-in-the-Loop (HITL):** Spatial bounding boxes for low-confidence fields for instant visual verification.
+* **AI Extraction:** Extracts structured JSON with vision models from Gemini, OpenAI, Groq or Anthropic, falling back automatically between providers.
+* **Human-in-the-Loop (HITL):** Per-field confidence scores and side-by-side review against the original photo before anything is synced.
 * **Zero Storage:** document data is not stored in DocSync's app database; it is sent to user-selected destinations.
 
 ## Slide 4: Agentic Architecture & Technical Win
-* **Deep Agentic Pipeline:** 3-stage Codex loop (Schema Generation, Transform/Heal, Logical Validation).
-* **Zero Infrastructure Liability:** We don't store user data. It's secure by design.
-* **Smart Compression:** Dual-branch image pipeline reduces token costs by 86% and archive storage by 96%.
-* **Enterprise Security:** AES-256-GCM encrypted BYOK (Bring Your Own Key) and simulated KMS.
+* **Agentic Pipeline:** Multi-provider extraction → document-specific business-rule checks (PAN compliance, weight logic) → human review → isolated sync to Sheets, Notion and Drive.
+* **Zero Infrastructure Liability:** DocSync keeps no copy of user documents; data goes only to the destinations the user picks.
+* **Smart Compression:** Client- and server-side compression keeps uploads under Vercel's 4.5MB limit and stores compact WebP archive copies.
+* **Enterprise Security:** AES-256-GCM encrypted BYOK (Bring Your Own Key), envelope encryption for stored keys, signed demo sessions and per-route rate limits.
+* **Fault Isolation:** Each module (AI, Sheets, Notion, media, transcription) has its own timeout, kill switch and circuit breaker — one outage never takes down the rest.
 
 ## Slide 5: The Demo
 * **[🎥 Watch Demo Video](https://youtu.be/4H7RTwGbt1I)**

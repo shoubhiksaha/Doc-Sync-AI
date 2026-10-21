@@ -1,0 +1,120 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.subtitle {
+  max-width: 60ch;
+  color: var(--text-2);
+  font-size: 1.05rem;
+}
+
+.profiles {
+  display: grid;
+  gap: 16px;
+  list-style: none;
+}
+
+@media (min-width: 860px) {
+  .profiles { grid-template-columns: 1fr 1fr; }
+}
+
+.profileCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  height: 100%;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.profileCard:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+.profileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.profileText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profileTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.profileDescription {
+  color: var(--text-2);
+}
+
+.profileCta {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+}
+
+@media (min-width: 560px) {
+  .profileCard { grid-template-columns: auto 1fr auto; align-items: center; }
+  .profileCta { grid-column: auto; justify-self: end; }
+}
+
+.comingSoon {
+  margin-top: 32px;
+  color: var(--text-2);
+}
+
+.comingSoon summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  list-style: none;
+}
+
+.chips li {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.footer {
+  margin-top: 32px;
+  max-width: 70ch;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
