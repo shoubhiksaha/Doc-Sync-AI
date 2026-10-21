@@ -1,42 +1,5 @@
-import { appEnvironment, appVersion, env, isDemoEnabled, isModuleEnabled } from '@/core/env';
-import { createGuestToken, GUEST_TTL_SECONDS, verifyGuestToken } from '@/core/guest';
+import { appEnvironment, appVersion, env, isModuleEnabled } from '@/core/env';
 import { normalizeKey, parseNumber } from '@/core/text';
-
-describe('core/guest', () => {
-  const secret = 'test-secret';
-
-  it('verifies a token it issued', async () => {
-    const token = await createGuestToken(secret);
-    await expect(verifyGuestToken(token, secret)).resolves.toBe(true);
-  });
-
-  it('rejects the old unsigned cookie value', async () => {
-    await expect(verifyGuestToken('true', secret)).resolves.toBe(false);
-  });
-
-  it('rejects a token signed with another secret', async () => {
-    const token = await createGuestToken('other');
-    await expect(verifyGuestToken(token, secret)).resolves.toBe(false);
-  });
-
-  it('rejects a tampered expiry', async () => {
-    const token = await createGuestToken(secret);
-    const parts = token.split('.');
-    parts[1] = String(Number(parts[1]) + 999999);
-    await expect(verifyGuestToken(parts.join('.'), secret)).resolves.toBe(false);
-  });
-
-  it('rejects an expired token', async () => {
-    const now = Date.now();
-    const token = await createGuestToken(secret, now);
-    await expect(verifyGuestToken(token, secret, now + (GUEST_TTL_SECONDS + 1) * 1000)).resolves.toBe(false);
-  });
-
-  it('rejects missing token or secret', async () => {
-    await expect(verifyGuestToken(undefined, secret)).resolves.toBe(false);
-    await expect(verifyGuestToken(await createGuestToken(secret), undefined)).resolves.toBe(false);
-  });
-});
 
 describe('core/env', () => {
   const saved = { ...process.env };
@@ -69,8 +32,6 @@ describe('core/env', () => {
     }
     process.env.MODULE_NOTION = 'on';
     expect(isModuleEnabled('notion')).toBe(true);
-    process.env.MODULE_DEMO = 'off';
-    expect(isDemoEnabled()).toBe(false);
   });
 
   it('env() trims and treats blanks as unset', () => {

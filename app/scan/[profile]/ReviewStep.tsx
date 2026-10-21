@@ -13,7 +13,6 @@ import styles from './scan.module.css';
 interface ReviewStepProps {
   state: ScanState;
   dispatch: Dispatch<ScanAction>;
-  isGuest: boolean;
   saving: boolean;
   countdown: number;
   /** Field key used for the duplicate check; '' means "don't check". */
@@ -96,7 +95,7 @@ function PhotoViewer({ urls, open, onClose }: { urls: string[]; open: boolean; o
   );
 }
 
-export default function ReviewStep({ state, dispatch, isGuest, saving, countdown, duplicateKey, onDuplicateKey, onSave, onStartOver }: ReviewStepProps) {
+export default function ReviewStep({ state, dispatch, saving, countdown, duplicateKey, onDuplicateKey, onSave, onStartOver }: ReviewStepProps) {
   const { t } = useI18n();
   const urls = usePageUrls(state.pages);
   const [page, setPage] = useState(0);
@@ -149,8 +148,8 @@ export default function ReviewStep({ state, dispatch, isGuest, saving, countdown
         </div>
 
         {state.isMock && (
-          <Notice tone="warning" title={state.quotaFallback ? t('review.quotaTitle') : t('review.sampleTitle')} urgent>
-            <p>{state.quotaFallback ? t('review.quotaBody') : t('review.sampleBody')}</p>
+          <Notice tone="warning" title={t('review.sampleTitle')} urgent>
+            <p>{t('review.sampleBody')}</p>
           </Notice>
         )}
         {state.error && <Notice tone="danger" title={t('error.saveTitle')} urgent><p>{t(`error.${state.error}`)}</p></Notice>}
@@ -222,7 +221,7 @@ export default function ReviewStep({ state, dispatch, isGuest, saving, countdown
           <span className={styles.count}>{t('review.fieldCount', { count: active.length })}</span>
           <Button onClick={onStartOver} disabled={saving}>{t('review.startOver')}</Button>
           <Button variant="primary" size="lg" wrap loading={saving} disabled={active.length === 0} onClick={onSave}>
-            {saving ? t('common.saving') : isGuest ? t('review.saveDemo') : t('review.save')}
+            {saving ? t('common.saving') : t('review.save')}
           </Button>
         </div>
       </div>

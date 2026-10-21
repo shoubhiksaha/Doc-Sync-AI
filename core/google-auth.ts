@@ -1,31 +1,12 @@
 import { google, type drive_v3 } from 'googleapis';
-import { env } from './env';
 
-export type GoogleAuth = InstanceType<typeof google.auth.OAuth2> | InstanceType<typeof google.auth.JWT>;
+export type GoogleAuth = InstanceType<typeof google.auth.OAuth2>;
 
-/** The signed-in user's OAuth token, or the demo service account when there is none. */
-export function getGoogleAuth(accessToken?: string): GoogleAuth | null {
-  if (accessToken) {
-    const auth = new google.auth.OAuth2();
-    auth.setCredentials({ access_token: accessToken });
-    return auth;
-  }
-  return serviceAccountAuth();
-}
-
-export function serviceAccountAuth(): GoogleAuth | null {
-  const email = env('GOOGLE_SERVICE_ACCOUNT_EMAIL');
-  const key = env('GOOGLE_PRIVATE_KEY');
-  if (!email || !key) return null;
-  return new google.auth.JWT({
-    email,
-    key: key.replace(/^"|"$/g, '').replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'],
-  });
-}
-
-export function hasServiceAccount(): boolean {
-  return Boolean(env('GOOGLE_SERVICE_ACCOUNT_EMAIL') && env('GOOGLE_PRIVATE_KEY'));
+/** Google API auth for the signed-in user's OAuth token. */
+export function getGoogleAuth(accessToken: string): GoogleAuth {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+  return auth;
 }
 
 /** Escapes a value for a Drive `q` string literal. */

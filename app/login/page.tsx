@@ -1,11 +1,7 @@
 'use client';
-import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { Languages } from 'lucide-react';
 import { useI18n } from '@/client/i18n/I18nProvider';
-import { track } from '@/client/telemetry';
-import { Button, Notice } from '../components/ui';
 import styles from './login.module.css';
 
 /** Google's multi-colour "G" mark, as required by the Sign in with Google branding guidelines. */
@@ -21,26 +17,8 @@ function GoogleMark() {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const { t, lang, setLang } = useI18n();
-  const [demoError, setDemoError] = useState(false);
-  const [startingDemo, setStartingDemo] = useState(false);
   const other = lang === 'en' ? 'hi' : 'en';
-
-  const startDemo = async () => {
-    setStartingDemo(true);
-    setDemoError(false);
-    try {
-      const res = await fetch('/api/auth/guest', { method: 'POST' });
-      if (!res.ok) throw new Error(String(res.status));
-      track('demo_started');
-      router.push('/');
-      router.refresh();
-    } catch {
-      setDemoError(true);
-      setStartingDemo(false);
-    }
-  };
 
   return (
     <main id="main" className={styles.page}>
@@ -60,19 +38,9 @@ export default function LoginPage() {
             <GoogleMark />
             {t('login.google')}
           </button>
-          <Button size="lg" fullWidth wrap loading={startingDemo} onClick={startDemo}>
-            {startingDemo ? t('login.demoStarting') : t('login.demo')}
-          </Button>
-          {demoError && <Notice tone="danger" urgent>{t('login.demoUnavailable')}</Notice>}
         </div>
 
-        <details className={styles.compare}>
-          <summary>{t('login.compareTitle')}</summary>
-          <ul>
-            <li>{t('login.compareGoogle')}</li>
-            <li>{t('login.compareDemo')}</li>
-          </ul>
-        </details>
+        <p className={styles.where}>{t('login.where')}</p>
 
         <p className={styles.footer}>{t('home.footer')}</p>
       </div>

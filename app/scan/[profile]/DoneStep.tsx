@@ -14,7 +14,6 @@ interface DoneStepProps {
   result: SaveResult;
   fields: { key: string; label: string; value: string }[];
   documentName: string;
-  isGuest: boolean;
   retrying: Destination | null;
   offerRemember: boolean;
   offerNotion: boolean;
@@ -25,9 +24,8 @@ interface DoneStepProps {
   onScanNext: () => void;
 }
 
-function statusOf(destination: Destination, outcome: DestinationResult | undefined, result: SaveResult): { key: MessageKey; tone: Tone } {
+function statusOf(outcome: DestinationResult | undefined): { key: MessageKey; tone: Tone } {
   if (!outcome) return { key: 'dest.skipped', tone: 'neutral' };
-  if (destination === 'sheets' && outcome.status === 'success' && result.mock) return { key: 'dest.demoSheet', tone: 'warning' };
   if (outcome.status === 'success') return { key: 'dest.saved', tone: 'success' };
   if (outcome.status === 'failed') return { key: 'dest.failed', tone: 'danger' };
   const code = (CODES as readonly string[]).includes(outcome.code) ? outcome.code : 'skipped';
@@ -38,13 +36,11 @@ function statusOf(destination: Destination, outcome: DestinationResult | undefin
 export default function DoneStep(props: DoneStepProps) {
   const { t } = useI18n();
   const { result } = props;
-  const [titleKey, bodyKey, tone, Icon]: [MessageKey, MessageKey, Tone, LucideIcon] = result.mock
-    ? ['done.mock', 'done.mockBody', 'warning', TriangleAlert]
-    : result.status === 'saved'
-      ? ['done.saved', 'done.savedBody', 'success', CircleCheck]
-      : result.status === 'partial'
-        ? ['done.partial', 'done.partialBody', 'warning', TriangleAlert]
-        : ['done.failed', 'done.failedBody', 'danger', CircleX];
+  const [titleKey, bodyKey, tone, Icon]: [MessageKey, MessageKey, Tone, LucideIcon] = result.status === 'saved'
+    ? ['done.saved', 'done.savedBody', 'success', CircleCheck]
+    : result.status === 'partial'
+      ? ['done.partial', 'done.partialBody', 'warning', TriangleAlert]
+      : ['done.failed', 'done.failedBody', 'danger', CircleX];
 
   return (
     <div className={styles.done}>
@@ -58,7 +54,7 @@ export default function DoneStep(props: DoneStepProps) {
         <ul className={styles.destinations}>
           {DESTINATIONS.map(destination => {
             const outcome = result.destinations[destination];
-            const status = statusOf(destination, outcome, result);
+            const status = statusOf(outcome);
             const DestIcon = ICONS[destination];
             return (
               <li key={destination} className={styles.destination}>
@@ -111,7 +107,7 @@ export default function DoneStep(props: DoneStepProps) {
         </Card>
       )}
 
-      {props.offerNotion && !props.isGuest && (
+      {props.offerNotion && (
         <Card title={t('done.notionTitle')} description={t('done.notionBody')}>
           <div className={styles.row}>
             <ButtonLink href="/api/auth/notion" native variant="primary" icon={<BookOpen size={18} aria-hidden />} onClick={() => track('notion_offer', { action: 'connect' })}>{t('done.notionConnect')}</ButtonLink>

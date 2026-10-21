@@ -12,27 +12,23 @@ jest.mock('@/modules/settings', () => ({
 
 import { NextRequest } from 'next/server';
 import { POST as extract } from '@/app/api/extract-freeform/route';
-import { createGuestToken } from '@/core/guest';
 import { resetRateLimits } from '@/core/rate-limit';
 import { ExtractionUnavailableError } from '@/modules/extraction';
 
 const SECRET = 'route-secret';
 const png = (name = 'page.png', type = 'image/png', size = 10) => new File([new Uint8Array(size)], name, { type });
 
-async function request(files: File[], opts: { guest?: boolean; profileId?: string } = {}) {
+async function request(files: File[], opts: { profileId?: string } = {}) {
   const form = new FormData();
   files.forEach(f => form.append('document', f));
   form.append('profileId', opts.profileId ?? 'ngo-receipt');
-  const headers: Record<string, string> = {};
-  if (opts.guest) headers.cookie = `docsync_guest=${await createGuestToken(SECRET)}`;
-  return new NextRequest('http://localhost/api/extract-freeform', { method: 'POST', body: form, headers });
+  return new NextRequest('http://localhost/api/extract-freeform', { method: 'POST', body: form });
 }
 
 describe('POST /api/extract-freeform', () => {
   const saved = { ...process.env };
   beforeEach(() => {
     process.env = { ...saved, NEXTAUTH_SECRET: SECRET };
-    delete process.env.DEMO_DAILY_AI_LIMIT;
     getToken.mockReset().mockResolvedValue({ email: 'u@x', accessToken: 't' });
     extractFields.mockReset().mockResolvedValue({ documentType: 'Receipt', fields: [], isMock: true, warnings: [], stats: { originalSize: 1, processedSize: 1 } });
     resetRateLimits();
@@ -40,9 +36,15 @@ describe('POST /api/extract-freeform', () => {
   });
   afterAll(() => { process.env = saved; });
 
-  it('rejects anonymous callers', async () => {
+  it('rejects anonymous callers, including leftover demo cookies', async () => {
     getToken.mockResolvedValue(null);
     expect((await extract(await request([png()]))).status).toBe(401);
+    const form = new FormData();
+    form.append('document', png());
+    form.append('profileId', 'ngo-receipt');
+    const legacy = new NextRequest('http://localhost/api/extract-freeform', { method: 'POST', body: form, headers: { cookie: 'docsync_guest=v1.9999999999.n.s' } });
+    expect((await extract(legacy)).status).toBe(401);
+    expect(extractFields).not.toHaveBeenCalled();
   });
 
   it('passes every page to the extraction module', async () => {
@@ -69,14 +71,6 @@ describe('POST /api/extract-freeform', () => {
     expect(await res.json()).toMatchObject({ code: 'bad_input' });
   });
 
-  it('enforces the demo daily budget for guests', async () => {
-    getToken.mockResolvedValue(null);
-    process.env.DEMO_DAILY_AI_LIMIT = '0';
-    const res = await extract(await request([png()], { guest: true }));
-    expect(res.status).toBe(429);
-    expect(await res.json()).toMatchObject({ code: 'demo_budget' });
-  });
-
   it.each([
     [new ExtractionUnavailableError('busy', true), 'quota', 429],
     [new ExtractionUnavailableError('down', false), 'unavailable', 502],
@@ -89,11 +83,5 @@ describe('POST /api/extract-freeform', () => {
     const body = await res.json();
     expect(body.code).toBe(code);
     expect(body.error).not.toContain('kaboom');
-  });
-
-  it('flags a quota fallback with a header', async () => {
-    extractFields.mockResolvedValue({ fields: [], isMock: true, quotaFallback: true, warnings: [], stats: { originalSize: 1, processedSize: 1 } });
-    const res = await extract(await request([png()]));
-    expect(res.headers.get('x-docsync-ai-fallback')).toBe('quota');
   });
 });

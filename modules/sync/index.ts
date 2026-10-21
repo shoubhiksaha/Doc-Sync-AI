@@ -33,7 +33,7 @@ export interface SyncInput {
   document?: Buffer | null;
   audio?: Buffer | null;
   audioMimeType?: string;
-  caller: { accessToken?: string; isGuest: boolean };
+  caller: { accessToken?: string };
   notion: { apiKey?: string | null; databaseId?: string | null };
   uploadDest: UploadDest;
   spreadsheetId?: string | null;
@@ -136,7 +136,6 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
     return runIsolated(
       () => deps.media.storeMedia({
         accessToken: input.caller.accessToken,
-        isGuest: input.caller.isGuest,
         profileId: input.profile.id,
         image: imageForMedia,
         audio: audioForMedia,

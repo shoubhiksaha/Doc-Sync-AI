@@ -6,9 +6,9 @@
 #
 # Both environments live in one Vercel project:
 #   production → Vercel "Production" environment, https://docsync.analogdigital.tech
-#                (Firestore database "(default)", production demo sheet)
+#                (Firestore database "(default)")
 #   staging    → Vercel "Preview" environment, aliased to $STAGING_DOMAIN when set
-#                (Firestore database "staging" via FIRESTORE_DATABASE_ID, its own demo sheet)
+#                (Firestore database "staging" via FIRESTORE_DATABASE_ID)
 #
 # Each environment's runtime variables are managed in Vercel (Settings → Environment
 # Variables → Preview / Production); `vercel pull` brings the right set into the build.

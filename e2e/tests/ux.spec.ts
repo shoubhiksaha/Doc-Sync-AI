@@ -1,9 +1,26 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { signIn } from '../support/session';
 
 // UX gate, run on a desktop and a phone viewport (see playwright.config.ts). It walks the main
 // flow in mock mode and fails on serious/critical WCAG 2.2 AA violations, an off-screen primary
 // action, clipped field values, horizontal scrolling, or dialogs that don't open on top / close.
+// The save is answered by a stub, so the run never touches a Google account.
+
+const SAVED = {
+  success: true,
+  partial: false,
+  message: 'Successfully synced to all destinations',
+  errors: [],
+  warnings: [],
+  destinations: {
+    sheets: { status: 'success', code: 'saved' },
+    notion: { status: 'skipped', code: 'not_connected' },
+    media: { status: 'success', code: 'saved' },
+  },
+  spreadsheetId: 'e2e-sheet',
+  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/e2e-sheet/edit',
+};
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -14,15 +31,16 @@ async function expectAccessible(page: Page, screen: string) {
 }
 
 test.describe('UX (local, mock mode)', () => {
-  test('demo → sample scan → check → save is accessible and usable at this screen size', async ({ page }) => {
+  test('sign in → sample scan → check → save is accessible and usable at this screen size', async ({ page, baseURL }) => {
     test.setTimeout(120_000);
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto('/login');
     await expectAccessible(page, 'login');
-    await page.getByRole('button', { name: /Try the demo/ }).click();
-    await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 });
+    await signIn(page.context(), baseURL!);
+    await page.route('**/api/sync', (route) => route.fulfill({ json: SAVED }));
+    await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page).toHaveTitle(/DocSync/);
     // Nothing interrupts the first visit.
@@ -40,7 +58,7 @@ test.describe('UX (local, mock mode)', () => {
     await expectAccessible(page, 'review');
 
     // The primary action stays on screen, and no value or page content is cut off.
-    const save = page.getByRole('button', { name: /Save to (the demo|Google) sheet/ });
+    const save = page.getByRole('button', { name: 'Save to Google Sheet' });
     const box = await save.boundingBox();
     const viewport = page.viewportSize()!;
     expect(box).not.toBeNull();
@@ -64,7 +82,7 @@ test.describe('UX (local, mock mode)', () => {
 
     await page.getByLabel('Amount', { exact: true }).fill('₹5,500');
     await save.click();
-    await expect(page.getByRole('heading', { name: /Saved|Demo only|Not saved/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'Where it went' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Scan the next one' })).toBeVisible();
     await expectAccessible(page, 'done');

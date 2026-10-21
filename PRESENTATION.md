@@ -22,7 +22,7 @@
 * **Agentic Pipeline:** Multi-provider extraction → document-specific business-rule checks (PAN compliance, weight logic) → human review → isolated sync to Sheets, Notion and Drive.
 * **Zero Infrastructure Liability:** DocSync keeps no copy of user documents; data goes only to the destinations the user picks.
 * **Smart Compression:** Client- and server-side compression keeps uploads under Vercel's 4.5MB limit and stores compact WebP archive copies.
-* **Enterprise Security:** AES-256-GCM encrypted BYOK (Bring Your Own Key), envelope encryption for stored keys, signed demo sessions and per-route rate limits.
+* **Enterprise Security:** AES-256-GCM encrypted BYOK (Bring Your Own Key), envelope encryption for stored keys and per-route rate limits.
 * **Fault Isolation:** Each module (AI, Sheets, Notion, media, transcription) has its own timeout, kill switch and circuit breaker — one outage never takes down the rest.
 
 ## Slide 5: The Demo
