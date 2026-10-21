@@ -3,7 +3,6 @@ jest.mock('next-auth/jwt', () => ({ getToken: (...a: unknown[]) => getToken(...a
 
 import { NextRequest } from 'next/server';
 import { middleware } from '@/middleware';
-import { createGuestToken } from '@/core/guest';
 import { resetRateLimits, limitFor } from '@/core/rate-limit';
 
 const SECRET = 'mw-secret';
@@ -18,7 +17,6 @@ describe('middleware', () => {
   const saved = { ...process.env };
   beforeEach(() => {
     process.env = { ...saved, NEXTAUTH_SECRET: SECRET };
-    delete process.env.MODULE_DEMO;
     getToken.mockReset().mockResolvedValue(null);
     resetRateLimits();
   });
@@ -36,19 +34,9 @@ describe('middleware', () => {
     expect(page.headers.get('location')).toBe('http://localhost/login');
   });
 
-  it('no longer accepts the forgeable docsync_guest=true cookie', async () => {
+  it('ignores cookies left over from the removed demo mode', async () => {
     expect((await middleware(request('/api/settings', 'docsync_guest=true'))).status).toBe(401);
-  });
-
-  it('accepts a signed guest session', async () => {
-    const token = await createGuestToken(SECRET);
-    expect((await middleware(request('/api/settings', `docsync_guest=${token}`))).status).toBe(200);
-  });
-
-  it('rejects guest sessions while demo mode is switched off', async () => {
-    process.env.MODULE_DEMO = 'off';
-    const token = await createGuestToken(SECRET);
-    expect((await middleware(request('/api/settings', `docsync_guest=${token}`))).status).toBe(401);
+    expect((await middleware(request('/api/settings', 'docsync_guest=v1.9999999999.nonce.signature'))).status).toBe(401);
   });
 
   it('accepts a verified NextAuth session and sends signed-in users away from /login', async () => {
@@ -58,18 +46,12 @@ describe('middleware', () => {
     expect(login.headers.get('location')).toBe('http://localhost/');
   });
 
-  it('rate-limits guest AI calls', async () => {
-    const cookie = `docsync_guest=${await createGuestToken(SECRET)}`;
-    for (let i = 0; i < limitFor('ai', 'guest'); i++) {
-      expect((await middleware(request('/api/extract-freeform', cookie))).status).toBe(200);
+  it('rate-limits AI calls per signed-in client', async () => {
+    getToken.mockResolvedValue({ email: 'u@x.com' });
+    for (let i = 0; i < limitFor('ai'); i++) {
+      expect((await middleware(request('/api/extract-freeform'))).status).toBe(200);
     }
-    expect((await middleware(request('/api/extract-freeform', cookie))).status).toBe(429);
-  });
-
-  it('rate-limits issuing guest sessions', async () => {
-    for (let i = 0; i < limitFor('guest-issue', 'anonymous'); i++) {
-      expect((await middleware(request('/api/auth/guest', undefined, '7.7.7.7'))).status).toBe(200);
-    }
-    expect((await middleware(request('/api/auth/guest', undefined, '7.7.7.7'))).status).toBe(429);
+    expect((await middleware(request('/api/extract-freeform'))).status).toBe(429);
+    expect((await middleware(request('/api/extract-freeform', undefined, '6.6.6.6'))).status).toBe(200);
   });
 });

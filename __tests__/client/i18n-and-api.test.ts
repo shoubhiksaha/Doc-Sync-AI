@@ -39,7 +39,8 @@ describe('client/api', () => {
   });
 
   it('maps statuses and server codes to error codes', () => {
-    expect(errorCodeFor(429, { code: 'demo_budget' })).toBe('demo_budget');
+    expect(errorCodeFor(429, { code: 'quota' })).toBe('quota');
+    expect(errorCodeFor(429, { code: 'demo_budget' })).toBe('rate_limited');
     expect(errorCodeFor(429, { code: 'made_up' })).toBe('rate_limited');
     expect(errorCodeFor(401, null)).toBe('session');
     expect(errorCodeFor(413, null)).toBe('too_large');
@@ -51,7 +52,7 @@ describe('client/api', () => {
   it('extracts with every page and the remembered field names', async () => {
     respond(200, { success: true, fields: [{ key: 'a' }], isMock: true, warnings: ['w'] });
     const result = await extractDocument([new Blob(['1']), new Blob(['2'])], 'ngo-receipt', ['Amount']);
-    expect(result).toMatchObject({ isMock: true, quotaFallback: false, warnings: ['w'] });
+    expect(result).toMatchObject({ isMock: true, warnings: ['w'] });
     const form = fetchMock.mock.calls[0][1].body as FormData;
     expect(form.getAll('document')).toHaveLength(2);
     expect(form.get('customFields')).toBe('["Amount"]');
@@ -106,7 +107,7 @@ describe('client/api', () => {
     respond(400, { error: 'x' });
     await expect(savePrefs('p', {})).rejects.toMatchObject({ code: 'bad_input' });
 
-    respond(200, { hasOpenAiKey: true, isGuest: false });
+    respond(200, { hasOpenAiKey: true });
     expect((await fetchSettings()).hasOpenAiKey).toBe(true);
     respond(200, { success: true, warning: 'cloud failed' });
     expect(await saveSettings({ uploadDest: 'gdrive' })).toEqual({ warning: 'cloud failed' });

@@ -11,7 +11,7 @@
 export const TELEMETRY_EVENTS = [
   'scan_opened', 'photo_added', 'extract_succeeded', 'extract_failed', 'review_confirmed',
   'sync_finished', 'sync_failed', 'duplicate_found', 'fields_remembered', 'fields_forgotten',
-  'auto_save_cancelled', 'retry', 'offline_saved', 'notion_offer', 'demo_started',
+  'auto_save_cancelled', 'retry', 'offline_saved', 'notion_offer',
   'language_changed', 'client_error',
 ] as const;
 
@@ -67,9 +67,9 @@ export function sanitizeEvent(raw: unknown): TelemetryEvent | null {
   return { event: event as TelemetryEventName, props: clean };
 }
 
-/** One log line per event. Caller kind only — never an email or user ID. */
-export function logEvents(events: TelemetryEvent[], caller: 'guest' | 'user', now = new Date()): void {
+/** One log line per event — never an email or user ID. */
+export function logEvents(events: TelemetryEvent[], now = new Date()): void {
   for (const e of events) {
-    console.info(JSON.stringify({ type: 'telemetry', at: now.toISOString(), caller, event: e.event, ...e.props }));
+    console.info(JSON.stringify({ type: 'telemetry', at: now.toISOString(), event: e.event, ...e.props }));
   }
 }

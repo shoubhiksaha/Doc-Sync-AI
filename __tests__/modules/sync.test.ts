@@ -37,7 +37,7 @@ const base = (): SyncInput => ({
   note: 'checked',
   document: Buffer.from('img'),
   audio: Buffer.from('aud'),
-  caller: { accessToken: 't', isGuest: false },
+  caller: { accessToken: 't' },
   notion: { apiKey: 'k', databaseId: 'd' },
   uploadDest: 'both',
 });

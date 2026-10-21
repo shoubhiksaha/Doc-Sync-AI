@@ -41,6 +41,6 @@ section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
 
 ## Resilience & Persistence
 The agents are stateless. Signed-in users' keys come from encrypted cookies or (optionally)
-Firestore with envelope encryption. Demo users get a signed, rate-limited guest session that uses
-server keys within a daily budget and writes only to the shared demo sheet. Any module can be
+Firestore with envelope encryption. Everyone signs in with Google; there is no demo or guest mode,
+and each user's rows go only to their own sheet. Any module can be
 switched off with `MODULE_<NAME>=off`, and `/api/health` reports each module's state.
