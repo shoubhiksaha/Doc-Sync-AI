@@ -18,7 +18,7 @@ All variables are documented in [`.env.example`](./.env.example).
 
 ```bash
 npm install
-npm run dev            # http://localhost:3000 → "Try Demo Mode (No Login)"
+npm run dev            # http://localhost:3000 → "Try the demo, no sign-in"
 ```
 
 Checks (the same ones CI runs):
@@ -26,7 +26,7 @@ Checks (the same ones CI runs):
 ```bash
 npm run lint && npm run typecheck
 npm run test:coverage
-npm run build && npm run test:e2e   # Playwright smoke tests against the production build
+npm run build && npm run test:e2e   # Playwright smoke + accessibility/layout tests (desktop and phone) on the production build
 npm run setup:hooks                 # local pre-push guard (secret scan, no direct pushes to main/staging)
 ```
 
@@ -37,6 +37,14 @@ DocSync is split into independent modules — `ai`, `extraction`, `transcription
 Each document type (NGO receipts, factory weight slips, …) is a self-contained profile in `modules/profiles/`, so a document type can be added or changed without touching the rest.
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+## Using it
+
+1. **Pick a document type** and add a photo: take one, upload photos or a PDF (up to 4 pages), drag and drop, or paste. Reading starts straight away.
+2. **Check the details.** Fields that need a look are marked *Check* or *Missing*; edit values in place, rename, remove (restorable) or add fields, and add a typed or voice note.
+3. **Save.** The first save creates your Google Sheet automatically. The result screen shows where the record went (Sheet, Notion, Drive) and lets you retry any destination that failed.
+
+Save the same fields twice and DocSync offers to remember them: next time it fills them in, and saves on its own after a short countdown when everything was read clearly. Photos taken offline wait under **Recent scans** on the home page. The app is available in English and Hindi, works on phones and desktops, and can be installed as an app.
 
 ## Deployment
 

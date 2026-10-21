@@ -1,71 +1,96 @@
 'use client';
-import { useSession, signOut } from 'next-auth/react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { signIn, signOut, useSession } from 'next-auth/react';
+import { Info, Languages, LogOut, Settings } from 'lucide-react';
+import { useI18n } from '@/client/i18n/I18nProvider';
+import { clearScans } from '@/client/scan-store';
+import { Button, Dialog } from './ui';
+import { clearOfflineCaches } from './ServiceWorkerRegister';
+import styles from './Navbar.module.css';
+
+/** Clears everything this device holds for the session, then signs out (or ends the demo). */
+async function signOutEverywhere(hasSession: boolean) {
+  await fetch('/api/auth/guest', { method: 'DELETE' }).catch(() => undefined);
+  await clearScans();
+  await clearOfflineCaches();
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('docsync_')).forEach(k => localStorage.removeItem(k));
+  } catch {
+    // storage unavailable: nothing to clear
+  }
+  if (hasSession) await signOut({ callbackUrl: '/login' });
+  else window.location.href = '/login';
+}
 
 export default function Navbar() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
+  const { t, lang, setLang } = useI18n();
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  // Hide navbar on the login page
   if (pathname === '/login') return null;
+  const isGuest = status === 'unauthenticated';
+  const other = lang === 'en' ? 'hi' : 'en';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <nav style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-        <Link href="/" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none' }}>
-          DocSync AI
+    <header className={styles.header}>
+      <nav className={`container ${styles.nav}`} aria-label={t('nav.main')}>
+        <Link href="/" className={styles.brand} aria-label={t('nav.home')}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- tiny static SVG logo */}
+          <img src="/icon.svg" alt="" width={28} height={28} />
+          <span aria-hidden>DocSync AI</span>
         </Link>
-        
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <Link href="/settings" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem' }}>
-            Settings
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {session?.user?.image ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img 
-                src={session.user.image} 
-                alt="Profile" 
-                style={{ width: '32px', height: '32px', borderRadius: '50%' }}
-              />
-            ) : (
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                👤
-              </div>
-            )}
-            <button 
-              onClick={async () => {
-                await fetch('/api/auth/guest', { method: 'DELETE' }).catch(() => undefined);
-                if (session) {
-                  signOut({ callbackUrl: '/login' });
-                } else {
-                  window.location.href = '/login';
-                }
-              }}
-              style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
-            >
-              Logout
+
+        <div className={styles.actions}>
+          {isGuest && (
+            <button type="button" className={styles.demoChip} onClick={() => setDemoOpen(true)} aria-haspopup="dialog">
+              <Info size={16} aria-hidden />
+              {t('nav.demo')}
             </button>
-          </div>
+          )}
+          <button type="button" className={styles.navButton} onClick={() => setLang(other)} aria-label={t('nav.switchLanguageLabel')}>
+            <Languages size={20} aria-hidden />
+            <span lang={other}>{t('nav.switchLanguage')}</span>
+          </button>
+          <Link href="/settings" className={styles.navButton} aria-current={pathname === '/settings' ? 'page' : undefined}>
+            <Settings size={20} aria-hidden />
+            <span className={styles.collapsible}>{t('nav.settings')}</span>
+          </Link>
+          {session?.user?.image && (
+            /* eslint-disable-next-line @next/next/no-img-element -- remote Google avatar, tiny */
+            <img className={styles.avatar} src={session.user.image} alt={session.user.name || t('nav.account')} width={32} height={32} referrerPolicy="no-referrer" />
+          )}
+          <button
+            type="button"
+            className={styles.navButton}
+            disabled={signingOut}
+            onClick={async () => {
+              setSigningOut(true);
+              await signOutEverywhere(Boolean(session));
+            }}
+          >
+            <LogOut size={20} aria-hidden />
+            <span className={styles.collapsible}>{t('nav.signOut')}</span>
+          </button>
         </div>
       </nav>
 
-      {/* Demo Mode Banner */}
-      {status === 'unauthenticated' && (
-        <div style={{ 
-          backgroundColor: 'rgba(255, 165, 0, 0.1)', 
-          borderBottom: '1px solid rgba(255, 165, 0, 0.3)',
-          padding: '0.75rem 1rem', 
-          textAlign: 'center', 
-          fontSize: '0.9rem',
-          color: 'var(--text-secondary)'
-        }}>
-          <strong style={{ color: 'orange' }}>⚠️ Demo Mode Active:</strong> Data goes to one shared demo Google Sheet that other demo users can see. Please don&apos;t scan real personal documents.
-          <br/>
-          If you <strong>Log In with Google</strong>, the app creates private spreadsheets in your own Google Drive and stores the images and audio there.
-        </div>
-      )}
-    </div>
+      <Dialog
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        title={t('nav.demoTitle')}
+        closeLabel={t('common.close')}
+        description={t('nav.demoBody')}
+        actions={
+          <>
+            <Button onClick={() => setDemoOpen(false)}>{t('common.close')}</Button>
+            <Button variant="primary" wrap onClick={() => signIn('google', { callbackUrl: '/' })}>{t('nav.demoCta')}</Button>
+          </>
+        }
+      />
+    </header>
   );
 }

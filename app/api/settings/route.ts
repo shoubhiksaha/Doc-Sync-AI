@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorText, resolveCaller, unauthorized } from '@/core/http';
+import { detectProvider } from '@/modules/ai';
 import { saveSettings, settingsStatus } from '@/modules/settings';
 
+/** Partial update: only the fields present are changed; '' removes a saved value. */
 export async function POST(req: NextRequest) {
   if (!(await resolveCaller(req))) return unauthorized();
   try {
@@ -27,7 +29,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** What is saved, never the secrets themselves: the AI key comes back as a masked hint. */
 export async function GET(req: NextRequest) {
-  if (!(await resolveCaller(req))) return unauthorized();
-  return NextResponse.json(await settingsStatus(req));
+  const caller = await resolveCaller(req);
+  if (!caller) return unauthorized();
+  const status = await settingsStatus(req, { classifyKey: detectProvider });
+  return NextResponse.json({ ...status, isGuest: caller.isGuest });
 }

@@ -7,7 +7,7 @@ import { Redis } from '@upstash/redis/cloudflare';
  * per instance (resets on cold starts — a best-effort fallback). Edge-runtime compatible.
  */
 
-export type RateGroup = 'ai' | 'write' | 'guest-issue' | 'default';
+export type RateGroup = 'ai' | 'write' | 'guest-issue' | 'telemetry' | 'default';
 export type Caller = 'guest' | 'user' | 'anonymous';
 
 const WINDOW_MS = 10 * 60 * 1000;
@@ -16,6 +16,7 @@ const LIMITS: Record<RateGroup, Record<Caller, number>> = {
   ai:            { guest: 10, user: 30, anonymous: 0 },
   write:         { guest: 15, user: 60, anonymous: 0 },
   'guest-issue': { guest: 10, user: 10, anonymous: 10 },
+  telemetry:     { guest: 60, user: 120, anonymous: 0 },
   default:       { guest: 120, user: 240, anonymous: 120 },
 };
 
@@ -23,6 +24,7 @@ export function rateGroupFor(pathname: string): RateGroup {
   if (pathname === '/api/extract-freeform' || pathname === '/api/transcribe') return 'ai';
   if (pathname === '/api/sync' || pathname === '/api/sheets/create') return 'write';
   if (pathname === '/api/auth/guest') return 'guest-issue';
+  if (pathname === '/api/telemetry') return 'telemetry';
   return 'default';
 }
 

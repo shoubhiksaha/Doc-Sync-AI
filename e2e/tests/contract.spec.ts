@@ -51,7 +51,7 @@ test.describe(`Live environment contract (${expectedEnvironment || 'any'})`, () 
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto('/login', { waitUntil: 'load', timeout: 30000 });
-    await expect(page.getByRole('button', { name: 'Try Demo Mode (No Login)' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /Try the demo/ })).toBeVisible({ timeout: 15000 });
 
     expect(errors.filter((msg) => !msg.includes('net::ERR') && !msg.includes('Failed to fetch'))).toHaveLength(0);
   });

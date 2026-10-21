@@ -274,4 +274,19 @@ describe('UniversalAIAdapter', () => {
       expect(response).toBe('hello');
     });
   });
+
+  it('sends every page image to every provider', async () => {
+    const pages = [{ mimeType: 'image/jpeg', base64Data: 'p1' }, { mimeType: 'image/jpeg', base64Data: 'p2' }, { mimeType: 'image/jpeg', base64Data: 'p3' }];
+    const replies: Record<string, unknown> = {
+      openai: { choices: [{ message: { content: '{}' } }] },
+      google: { candidates: [{ content: { parts: [{ text: '{}' }] } }] },
+      anthropic: { content: [{ text: '{}' }] },
+    };
+    for (const provider of ['openai', 'google', 'anthropic'] as const) {
+      (global.fetch as jest.Mock).mockReset().mockResolvedValueOnce({ ok: true, json: async () => replies[provider] });
+      await new UniversalAIAdapter({ apiKey: 'fake', provider }).chat('sys', 'user', pages);
+      const sent = (global.fetch as jest.Mock).mock.calls[0][1].body as string;
+      for (const page of ['p1', 'p2', 'p3']) expect(sent).toContain(page);
+    }
+  });
 });

@@ -14,6 +14,14 @@ export const ngoReceipt: DocumentProfile = {
   sheetTab: 'NGO_Receipts',
   sheetTitle: 'DocSync — NGO Receipts',
   sampleDocument: { href: '/sample-ngo-receipt.png', fileName: 'Sample_NGO_Receipt.png' },
+  duplicateKey: 'receiptNumber',
+  translations: {
+    hi: {
+      title: 'NGO दान रसीदें',
+      documentName: 'NGO दान रसीद',
+      description: 'हाथ से लिखी ट्रस्ट रसीदों से दानदाता का नाम, राशि, PAN और तारीख निकालें।',
+    },
+  },
   extraction: {
     context: 'This is an Indian NGO donation receipt. Typical fields: receipt number, date, donor name, donor address, amount, payment mode, donor PAN, NGO name and 80G registration reference.',
     priorityFields: ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Receipt Number'],

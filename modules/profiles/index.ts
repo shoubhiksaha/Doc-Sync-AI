@@ -5,9 +5,11 @@
  */
 import { factoryWeightSlip } from './factory-weight-slip';
 import { ngoReceipt } from './ngo-receipt';
-import type { DocumentProfile, RecordField } from './types';
+import type { ComingSoonProfile, DocumentProfile, Lang, LocalizedProfileText, RecordField } from './types';
 
-export type { ComingSoonProfile, DocumentProfile, FieldCategory, NotionPropertySpec, NotionPropertyType, RecordField } from './types';
+export type {
+  ComingSoonProfile, DocumentProfile, FieldCategory, Lang, LocalizedProfileText, NotionPropertySpec, NotionPropertyType, RecordField,
+} from './types';
 export { comingSoonProfiles } from './catalog';
 export { fieldValue, findField } from './fields';
 
@@ -19,6 +21,16 @@ export function activeProfiles(): readonly DocumentProfile[] {
 
 export function getProfile(id: string | null | undefined): DocumentProfile | undefined {
   return PROFILES.find(p => p.id === id);
+}
+
+/** Title, document name and description in `lang`, falling back to English. */
+export function localizedProfile(profile: DocumentProfile, lang: Lang): LocalizedProfileText {
+  const english = { title: profile.title, documentName: profile.documentName, description: profile.description };
+  return lang === 'en' ? english : { ...english, ...profile.translations?.[lang] };
+}
+
+export function localizedComingSoon(item: ComingSoonProfile, lang: Lang): { title: string; description: string } {
+  return lang === 'hi' && item.hi ? item.hi : { title: item.title, description: item.description };
 }
 
 /** Runs the profile's derive() and returns the input unchanged if it throws. */

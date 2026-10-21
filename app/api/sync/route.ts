@@ -3,8 +3,8 @@ import { errorText, parseJson, resolveCaller, unauthorized } from '@/core/http';
 import { MAX_AUDIO_BYTES } from '@/modules/transcription';
 import { MAX_DOCUMENT_BYTES } from '@/modules/extraction';
 import { getProfile, type RecordField } from '@/modules/profiles';
-import { loadSettings, parseUploadDest } from '@/modules/settings';
-import { failedDestinations, syncDocument, type DestinationName, type SyncReport } from '@/modules/sync';
+import { loadProfilePrefs, loadSettings, parseUploadDest } from '@/modules/settings';
+import { DESTINATIONS, failedDestinations, syncDocument, type DestinationName, type SyncReport } from '@/modules/sync';
 
 export const maxDuration = 60;
 
@@ -25,21 +25,29 @@ function readFields(formData: FormData): RecordField[] {
     : [];
 }
 
-function primaryKeyFromCookie(req: NextRequest, profileId: string): string | null {
-  const raw = req.cookies.get(`docsync_pk_${profileId.replace(/-/g, '_')}`)?.value;
-  if (!raw) return null;
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
+/** `only=notion,media` retries just those destinations; unknown names are ignored, empty = all. */
+function readOnly(raw: FormDataEntryValue | null): DestinationName[] | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const names = raw.split(',').map(s => s.trim()).filter((s): s is DestinationName => (DESTINATIONS as readonly string[]).includes(s));
+  return names.length ? [...new Set(names)] : undefined;
 }
+
+const sheetCookie = (profileId: string) => `docsync_sheet_${profileId.replace(/-/g, '_')}`;
+
+type DestinationCode = 'saved' | 'failed' | 'not_connected' | 'not_selected' | 'nothing_to_store' | 'not_stored' | 'not_retried' | 'disabled' | 'paused' | 'duplicate' | 'skipped';
 
 function describe(report: SyncReport) {
   return Object.fromEntries(
     (Object.keys(report.destinations) as DestinationName[]).map(name => {
       const outcome = report.destinations[name];
-      return [name, outcome.status === 'failed' ? { status: 'failed', detail: outcome.error } : outcome.status === 'skipped' ? { status: 'skipped', detail: outcome.reason } : { status: 'success' }];
+      if (outcome.status === 'failed') return [name, { status: 'failed', code: 'failed' as DestinationCode, detail: outcome.error }];
+      if (outcome.status === 'skipped') return [name, { status: 'skipped', code: (outcome.code ?? 'skipped') as DestinationCode, detail: outcome.reason }];
+      // Media "succeeds" without uploading anything in demo mode (photos aren't stored there).
+      const media = report.destinations.media;
+      if (name === 'media' && media.status === 'ok' && !media.value.imageUrl && !media.value.audioUrl) {
+        return [name, { status: 'skipped', code: 'not_stored' as DestinationCode }];
+      }
+      return [name, { status: 'success', code: 'saved' as DestinationCode }];
     }),
   );
 }
@@ -67,7 +75,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Replacing rows is not available in demo mode. Choose "Keep Both" or sign in.' }, { status: 403 });
     }
 
-    const settings = await loadSettings(req);
+    const [settings, prefs] = await Promise.all([loadSettings(req), loadProfilePrefs(req, profile.id)]);
+    const formSheetId = formData.get('spreadsheetId');
+    const spreadsheetId = caller.isGuest
+      ? null
+      : (typeof formSheetId === 'string' && formSheetId.trim()) || req.cookies.get(sheetCookie(profile.id))?.value || null;
+
     const report = await syncDocument({
       profile,
       fields,
@@ -81,9 +94,11 @@ export async function POST(req: NextRequest) {
         databaseId: req.headers.get('x-notion-db-id') || settings.notionDbId,
       },
       uploadDest: parseUploadDest(formData.get('uploadDest') ?? settings.uploadDest),
-      spreadsheetId: caller.isGuest ? null : (formData.get('spreadsheetId') as string | null),
+      spreadsheetId,
       duplicateAction,
-      primaryKey: primaryKeyFromCookie(req, profile.id),
+      // '' means the user turned duplicate checks off; null falls back to the profile's default.
+      primaryKey: prefs.primaryKey ?? profile.duplicateKey ?? null,
+      only: readOnly(formData.get('only')),
     });
 
     if (report.duplicate) {
@@ -107,7 +122,7 @@ export async function POST(req: NextRequest) {
     if (caller.isGuest && sheets?.spreadsheetId) message += ' Demo mode writes to a shared demo sheet — sign in to use your own private sheet.';
     if (sheets?.mock) message += ' (Demo mode — not saved to a real sheet.)';
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: failed.length === 0,
       partial: failed.length > 0 && succeeded.length > 0,
       message,
@@ -115,8 +130,22 @@ export async function POST(req: NextRequest) {
       warnings: report.warnings,
       destinations: describe(report),
       imageUrl: report.imageLink,
+      spreadsheetId: sheets?.spreadsheetId ?? null,
       spreadsheetUrl: sheets?.spreadsheetUrl,
+      mock: Boolean(sheets?.mock),
     }, { status: failed.length > 0 && succeeded.length === 0 ? 502 : 200 });
+
+    // Remember the user's sheet for this profile so later syncs skip the Drive lookup.
+    if (!caller.isGuest && sheets?.spreadsheetId && !sheets.mock) {
+      response.cookies.set(sheetCookie(profile.id), sheets.spreadsheetId, {
+        httpOnly: false,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+    return response;
   } catch (error) {
     console.error('[sync] unexpected error:', errorText(error));
     return NextResponse.json({ error: `An internal error occurred during data sync: ${errorText(error)}` }, { status: 500 });

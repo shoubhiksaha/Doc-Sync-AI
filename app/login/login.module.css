@@ -1,0 +1,119 @@
+.page {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 72px var(--gutter) 32px;
+}
+
+.language {
+  position: absolute;
+  top: 12px;
+  right: var(--gutter);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.logo {
+  border-radius: 14px;
+}
+
+.title {
+  font-size: 1.75rem;
+}
+
+.tagline {
+  color: var(--text-2);
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Sign in with Google: neutral button per Google's branding guidelines (light and dark). */
+.google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 20px;
+  border: 1px solid #747775;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: #1f1f1f;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.google:hover {
+  background: #f8f9fa;
+}
+
+@media (prefers-color-scheme: dark) {
+  .google {
+    border-color: #8e918f;
+    background: #131314;
+    color: #e3e3e3;
+  }
+
+  .google:hover {
+    background: #1f1f20;
+  }
+}
+
+.compare {
+  width: 100%;
+  text-align: left;
+  color: var(--text-2);
+}
+
+.compare summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.compare ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.footer {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}

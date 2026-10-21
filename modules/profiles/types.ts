@@ -36,6 +36,10 @@ export interface DocumentProfile {
   /** Title for a newly created spreadsheet. */
   sheetTitle: string;
   sampleDocument?: { href: string; fileName: string };
+  /** Field key used for duplicate checks until the user picks another one. */
+  duplicateKey?: string;
+  /** UI copy in other languages; English is the fields above. */
+  translations?: { hi?: LocalizedProfileText };
   extraction: {
     /** Extra context for the extraction prompt. */
     context: string;
@@ -55,7 +59,16 @@ export interface DocumentProfile {
   validate?(fields: RecordField[]): string[];
 }
 
+export type Lang = 'en' | 'hi';
+
+export interface LocalizedProfileText {
+  title: string;
+  documentName: string;
+  description: string;
+}
+
 export interface ComingSoonProfile {
   title: string;
   description: string;
+  hi?: { title: string; description: string };
 }

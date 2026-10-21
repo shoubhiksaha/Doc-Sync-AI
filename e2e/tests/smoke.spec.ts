@@ -45,7 +45,7 @@ test.describe('Smoke (local, mock mode)', () => {
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Try Demo Mode (No Login)' }).click();
+    await page.getByRole('button', { name: /Try the demo/ }).click();
     await page.waitForURL((url) => url.pathname === '/', { timeout: 15000 });
 
     const ngo = page.locator('a[href="/scan/ngo-receipt"]');

@@ -37,7 +37,7 @@ describe('core/isolation', () => {
     process.env.MODULE_NOTION = 'off';
     const fn = jest.fn(async () => 1);
     const out = await runIsolated(fn, { module: 'notion', timeoutMs: 1000 });
-    expect(out.status).toBe('skipped');
+    expect(out).toMatchObject({ status: 'skipped', code: 'disabled' });
     expect(fn).not.toHaveBeenCalled();
   });
 
@@ -45,6 +45,8 @@ describe('core/isolation', () => {
     const out = await runIsolated(async () => { throw new ModuleSkip('not connected'); }, { module: 'notion', timeoutMs: 1000 });
     expect(out).toEqual({ status: 'skipped', reason: 'not connected' });
     expect(circuitState('notion')).toBe('closed');
+    const coded = await runIsolated(async () => { throw new ModuleSkip('no target', 'not_connected'); }, { module: 'notion', timeoutMs: 1000 });
+    expect(coded).toEqual({ status: 'skipped', reason: 'no target', code: 'not_connected' });
   });
 
   it('opens the circuit after repeated failures and skips further calls', async () => {
@@ -54,7 +56,7 @@ describe('core/isolation', () => {
     expect(circuitState('notion')).toBe('open');
     const fn = jest.fn(async () => 1);
     const out = await runIsolated(fn, { module: 'notion', timeoutMs: 1000 });
-    expect(out.status).toBe('skipped');
+    expect(out).toMatchObject({ status: 'skipped', code: 'paused' });
     expect(fn).not.toHaveBeenCalled();
   });
 

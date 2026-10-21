@@ -4,6 +4,8 @@ import {
   deriveFields,
   findField,
   getProfile,
+  localizedComingSoon,
+  localizedProfile,
   notionPropertyUnion,
   validateFields,
   type DocumentProfile,
@@ -85,5 +87,27 @@ describe('modules/profiles', () => {
   it('collects every Notion property used by any profile', () => {
     const names = notionPropertyUnion().map(p => p.name);
     expect(names).toEqual(expect.arrayContaining(['Amount', 'PAN', 'Gross Weight', 'Tare Weight', 'Net Weight']));
+  });
+
+  it('every active profile has a duplicate-check field that it actually extracts', () => {
+    for (const p of activeProfiles()) {
+      expect(p.duplicateKey).toBeTruthy();
+      expect(p.mockFields.map(m => m.key)).toContain(p.duplicateKey);
+    }
+  });
+
+  it('localizes profile copy, falling back to English', () => {
+    const ngo = getProfile('ngo-receipt')!;
+    expect(localizedProfile(ngo, 'en')).toEqual({ title: ngo.title, documentName: ngo.documentName, description: ngo.description });
+    expect(localizedProfile(ngo, 'hi').title).toMatch(/[\u0900-\u097F]/);
+    const untranslated = { ...ngo, translations: undefined } as DocumentProfile;
+    expect(localizedProfile(untranslated, 'hi').title).toBe(ngo.title);
+
+    for (const item of comingSoonProfiles) {
+      expect(item.hi?.title).toMatch(/[\u0900-\u097F]/);
+      expect(localizedComingSoon(item, 'hi')).toEqual(item.hi);
+      expect(localizedComingSoon(item, 'en')).toEqual({ title: item.title, description: item.description });
+    }
+    expect(localizedComingSoon({ title: 'T', description: 'D' }, 'hi')).toEqual({ title: 'T', description: 'D' });
   });
 });

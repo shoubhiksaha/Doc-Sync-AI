@@ -23,6 +23,7 @@ describe('modules/extraction', () => {
     resetBreakers();
     global.fetch = jest.fn();
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => jest.restoreAllMocks());
   afterAll(() => { process.env = saved; });
@@ -70,11 +71,35 @@ describe('modules/extraction', () => {
     const err = await extractFields({ document: image, profile: ngo }).catch(e => e);
     expect(err).toBeInstanceOf(ExtractionUnavailableError);
     expect(err.quotaLike).toBe(true);
+    expect(err.message).toMatch(/busy|limit/);
+    expect(err.message).not.toMatch(/429|quota/);
 
     process.env.DEMO_FALLBACK_ON_AI_QUOTA = 'true';
     resetBreakers();
     const res = await extractFields({ document: image, profile: ngo });
     expect(res).toMatchObject({ isMock: true, quotaFallback: true });
+  });
+
+  it('sends every page of a multi-page document in one request', async () => {
+    process.env.OPENAI_API_KEY = 'sk-x';
+    (global.fetch as jest.Mock).mockResolvedValue(modelReply({ fields: [{ key: 'amount', label: 'Amount', value: '1', confidence: 90 }] }));
+    const res = await extractFields({ documents: [image, image, image, image, image], profile: ngo });
+    expect(res.stats.originalSize).toBe(image.length * 4);
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    const parts = body.messages[1].content;
+    expect(parts.filter((p: { type: string }) => p.type === 'image_url')).toHaveLength(4);
+    expect(JSON.stringify(parts)).toContain('4 pages of the same document');
+  });
+
+  it('rejects unusable uploads as input errors, and hides provider details from the message', async () => {
+    await expect(extractFields({ profile: ngo })).rejects.toMatchObject({ kind: 'input' });
+    await expect(extractFields({ document: Buffer.from('not an image'), profile: ngo })).rejects.toMatchObject({ kind: 'input', message: expect.stringMatching(/JPG or PNG/) });
+
+    process.env.OPENAI_API_KEY = 'sk-x';
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 400, text: async () => 'model gpt-x does not exist' });
+    const err = await extractFields({ document: image, profile: ngo }).catch(e => e);
+    expect(err).toMatchObject({ kind: 'service', quotaLike: false });
+    expect(err.message).not.toContain('gpt-x');
   });
 
   it('honours the extraction kill switch', async () => {

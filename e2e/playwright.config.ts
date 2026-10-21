@@ -1,8 +1,10 @@
 import path from 'path';
 import { defineConfig, devices } from '@playwright/test';
 
-// Two suites share this config:
+// Three suites share this config:
 //   smoke.spec.ts    — `npm run test:e2e`: starts the built app locally (mock mode) and drives it.
+//   ux.spec.ts       — also `npm run test:e2e`, on desktop and phone viewports: accessibility (axe)
+//                      and layout checks along the main scan flow.
 //   contract.spec.ts — `npm run test:contract`: runs against a deployed environment (TARGET_URL),
 //                      used by the post-deploy verification jobs in staging.yml / production.yml.
 // When TARGET_URL or BASE_URL is set, no local server is started.
@@ -27,7 +29,11 @@ export default defineConfig({
       ? { 'x-vercel-protection-bypass': bypassSecret, 'x-vercel-set-bypass-cookie': 'true' }
       : undefined,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Phone layout (Chromium engine, so CI needs no extra browser): only the UX gate runs here.
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /ux\.spec\.ts/ },
+  ],
   webServer: remoteTarget
     ? undefined
     : {

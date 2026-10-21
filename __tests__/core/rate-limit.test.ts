@@ -22,6 +22,8 @@ describe('core/rate-limit', () => {
     expect(rateGroupFor('/api/sync')).toBe('write');
     expect(rateGroupFor('/api/sheets/create')).toBe('write');
     expect(rateGroupFor('/api/auth/guest')).toBe('guest-issue');
+    expect(rateGroupFor('/api/telemetry')).toBe('telemetry');
+    expect(limitFor('telemetry', 'anonymous')).toBe(0);
     expect(rateGroupFor('/api/settings')).toBe('default');
     expect(limitFor('ai', 'guest')).toBeLessThan(limitFor('ai', 'user'));
   });

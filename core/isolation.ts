@@ -15,11 +15,14 @@ import { isModuleEnabled, type ModuleName } from './env';
 
 export type Outcome<T> =
   | { status: 'ok'; value: T; ms: number }
-  | { status: 'skipped'; reason: string }
+  | { status: 'skipped'; reason: string; code?: SkipCode }
   | { status: 'failed'; error: string; ms: number };
 
+/** Machine-readable reason for a skip, so the UI can explain it without parsing text. */
+export type SkipCode = 'disabled' | 'paused' | 'not_connected' | 'not_selected' | 'nothing_to_store' | 'not_retried' | 'duplicate';
+
 export class ModuleSkip extends Error {
-  constructor(public readonly reason: string) {
+  constructor(public readonly reason: string, public readonly code?: SkipCode) {
     super(reason);
     this.name = 'ModuleSkip';
   }
@@ -88,10 +91,10 @@ export async function runIsolated<T>(fn: () => Promise<T>, opts: IsolationOption
   const key = opts.breakerKey ?? opts.module;
 
   if (!isModuleEnabled(opts.module)) {
-    return { status: 'skipped', reason: `${opts.module} is disabled (MODULE_${opts.module.toUpperCase()}=off)` };
+    return { status: 'skipped', reason: `${opts.module} is disabled (MODULE_${opts.module.toUpperCase()}=off)`, code: 'disabled' };
   }
   if (circuitState(key) === 'open') {
-    return { status: 'skipped', reason: `${key} is temporarily paused after repeated failures` };
+    return { status: 'skipped', reason: `${key} is temporarily paused after repeated failures`, code: 'paused' };
   }
 
   const started = Date.now();
@@ -101,7 +104,7 @@ export async function runIsolated<T>(fn: () => Promise<T>, opts: IsolationOption
     return { status: 'ok', value, ms: Date.now() - started };
   } catch (err) {
     if (err instanceof ModuleSkip) {
-      return { status: 'skipped', reason: err.reason };
+      return { status: 'skipped', reason: err.reason, ...(err.code ? { code: err.code } : {}) };
     }
     recordFailure(key);
     const error = err instanceof Error ? err.message : String(err);

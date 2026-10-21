@@ -29,8 +29,15 @@ down the others. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full d
 4. **Transcription (`modules/transcription`, `/api/transcribe`)**
    - Voice notes via Groq Whisper, Gemini or OpenAI Whisper, with the same fall-through behaviour.
 
-Sheet columns are proposed directly from the extracted fields in the UI (Sheet setup modal);
-there is no separate schema-suggestion endpoint.
+Sheet columns come from the fields the user approves on the review screen. The first save creates
+the sheet (or finds "DocSync AI Data") and new fields add columns; there is no separate setup step
+or schema-suggestion endpoint.
+
+## User interface
+The scan flow (`client/scan-flow.ts`, `app/scan/[profile]/`) is a small state machine: photo →
+reading → check → saved. Remembered fields and the duplicate-check field are per-profile
+preferences (`/api/profile-prefs`). Copy lives in `client/i18n/` (English and Hindi). See the UI
+section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
 
 ## Resilience & Persistence
 The agents are stateless. Signed-in users' keys come from encrypted cookies or (optionally)

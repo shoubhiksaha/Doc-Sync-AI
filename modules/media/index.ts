@@ -30,11 +30,11 @@ export interface MediaResult {
   notes: string[];
 }
 
-/** Smaller archive copy of the scan (WebP, ≤1500px). */
+/** Smaller archive copy of the scan (WebP, ≤1500px wide; tall enough for a few stacked pages). */
 export async function prepareArchiveImage(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
     .rotate()
-    .resize({ width: 1500, height: 1500, fit: 'inside', withoutEnlargement: true })
+    .resize({ width: 1500, height: 6000, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 68 })
     .toBuffer();
 }

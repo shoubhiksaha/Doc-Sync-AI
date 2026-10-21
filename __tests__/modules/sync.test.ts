@@ -149,4 +149,38 @@ describe('modules/sync — fault isolation', () => {
     await syncDocument({ ...base(), uploadDest: 'notion' }, d);
     expect(d.media.storeMedia).toHaveBeenCalled();
   });
+
+  it('reports why a destination was skipped with a machine-readable code', async () => {
+    const notConnected = await syncDocument({ ...base(), document: null, audio: null }, deps({ notion: { resolveNotionTarget: jest.fn(() => null) } }));
+    expect(notConnected.destinations.notion).toMatchObject({ status: 'skipped', code: 'not_connected' });
+    expect(notConnected.destinations.media).toMatchObject({ status: 'skipped', code: 'nothing_to_store' });
+
+    const driveOnly = await syncDocument({ ...base(), uploadDest: 'gdrive' }, deps());
+    expect(driveOnly.destinations.notion).toMatchObject({ status: 'skipped', code: 'not_selected' });
+
+    const dup = await syncDocument({ ...base(), primaryKey: 'vehicleNumber' }, deps({ sheets: { findDuplicates: jest.fn(async () => ({ count: 1, label: 'Vehicle', value: 'MH-12' })) } }));
+    expect(dup.destinations.sheets).toMatchObject({ status: 'skipped', code: 'duplicate' });
+  });
+
+  it('a retry (`only`) runs just the listed destinations and skips the duplicate check without Sheets', async () => {
+    const d = deps();
+    const report = await syncDocument({ ...base(), primaryKey: 'vehicleNumber', only: ['notion'] }, d);
+    expect(report.destinations.notion.status).toBe('ok');
+    expect(report.destinations.sheets).toMatchObject({ status: 'skipped', code: 'not_retried' });
+    expect(report.destinations.media).toMatchObject({ status: 'skipped', code: 'not_retried' });
+    expect(d.sheets.findDuplicates).not.toHaveBeenCalled();
+    expect(d.sheets.appendRecord).not.toHaveBeenCalled();
+    expect(d.media.storeMedia).not.toHaveBeenCalled();
+
+    const sheetsOnly = deps();
+    await syncDocument({ ...base(), primaryKey: 'vehicleNumber', only: ['sheets'] }, sheetsOnly);
+    expect(sheetsOnly.sheets.findDuplicates).toHaveBeenCalled();
+    expect(sheetsOnly.media.prepareArchiveImage).not.toHaveBeenCalled();
+    expect(sheetsOnly.notion.syncRecord).not.toHaveBeenCalled();
+
+    const all = deps();
+    await syncDocument({ ...base(), only: [] }, all);
+    expect(all.notion.syncRecord).toHaveBeenCalled();
+    expect(all.sheets.appendRecord).toHaveBeenCalled();
+  });
 });

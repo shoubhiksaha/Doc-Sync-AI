@@ -6,9 +6,10 @@
  * outage therefore can't stop the row reaching Google Sheets, and vice versa.
  *
  * Order: 1) read-only duplicate check (before any side effect), 2) Notion + media in parallel,
- * 3) Sheets, with whatever links steps 2 produced.
+ * 3) Sheets, with whatever links steps 2 produced. `only` limits a run to some destinations, so
+ * the UI can retry just the one that failed without writing a second Sheets row.
  */
-import { runIsolated, type Outcome } from '@/core/isolation';
+import { runIsolated, type Outcome, type SkipCode } from '@/core/isolation';
 import * as mediaModule from '@/modules/media';
 import * as notionModule from '@/modules/notion';
 import * as sheetsModule from '@/modules/sheets';
@@ -38,9 +39,12 @@ export interface SyncInput {
   spreadsheetId?: string | null;
   duplicateAction?: 'replace' | 'keep_both' | null;
   primaryKey?: string | null;
+  /** Run only these destinations (a retry); the others are skipped. Empty or missing = all. */
+  only?: DestinationName[];
 }
 
 export type DestinationName = 'sheets' | 'notion' | 'media';
+export const DESTINATIONS: readonly DestinationName[] = ['sheets', 'notion', 'media'];
 
 export interface SyncReport {
   duplicate?: sheetsModule.DuplicateReport;
@@ -53,7 +57,8 @@ export interface SyncReport {
   warnings: string[];
 }
 
-const skipped = (reason: string) => ({ status: 'skipped' as const, reason });
+const skipped = (reason: string, code: SkipCode) => ({ status: 'skipped' as const, reason, code });
+const NOT_RETRIED = 'not part of this retry';
 
 export function failedDestinations(report: SyncReport): DestinationName[] {
   return (Object.keys(report.destinations) as DestinationName[]).filter(d => report.destinations[d].status === 'failed');
@@ -63,9 +68,10 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
   const fields = deriveFields(input.profile, input.fields);
   const sheetFields = fields.map(f => ({ key: f.key, label: f.label, value: f.value }));
   const warnings: string[] = [];
+  const wanted = (d: DestinationName) => !input.only?.length || input.only.includes(d);
 
   // 1) Duplicate check — read-only, before anything is written anywhere.
-  if (input.primaryKey && !input.duplicateAction) {
+  if (wanted('sheets') && input.primaryKey && !input.duplicateAction) {
     const check = await runIsolated(
       () => deps.sheets.findDuplicates({
         caller: input.caller,
@@ -79,7 +85,7 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
     if (check.status === 'ok' && check.value) {
       return {
         duplicate: check.value,
-        destinations: { sheets: skipped('duplicate found'), notion: skipped('duplicate found'), media: skipped('duplicate found') },
+        destinations: { sheets: skipped('duplicate found', 'duplicate'), notion: skipped('duplicate found', 'duplicate'), media: skipped('duplicate found', 'duplicate') },
         imageLink: null,
         warnings,
       };
@@ -89,7 +95,7 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
 
   // 2) Notion + media in parallel.
   let archive: Buffer | null = null;
-  if (input.document) {
+  if (input.document && (wanted('notion') || wanted('media'))) {
     try {
       archive = await deps.media.prepareArchiveImage(input.document);
     } catch (err) {
@@ -103,35 +109,44 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
   const imageForMedia = archive && (input.uploadDest !== 'notion' || !notionWanted) ? archive : null;
   const audioForMedia = input.audio && (input.uploadDest !== 'notion' || !notionWanted) ? input.audio : null;
 
-  const [notion, media] = await Promise.all([
-    notionWanted
-      ? runIsolated(
-          () => deps.notion.syncRecord({
-            ...input.notion,
-            profile: input.profile,
-            fields,
-            note: input.note,
-            image: archive,
-            audio: input.audio,
-            audioMimeType: input.audioMimeType,
-          }),
-          { module: 'notion', timeoutMs: DESTINATION_TIMEOUT_MS },
-        )
-      : Promise.resolve(skipped(input.uploadDest === 'gdrive' ? 'Notion not selected as a destination' : 'Notion not connected')),
-    imageForMedia || audioForMedia
-      ? runIsolated(
-          () => deps.media.storeMedia({
-            accessToken: input.caller.accessToken,
-            isGuest: input.caller.isGuest,
-            profileId: input.profile.id,
-            image: imageForMedia,
-            audio: audioForMedia,
-            audioMimeType: input.audioMimeType,
-          }),
-          { module: 'media', timeoutMs: DESTINATION_TIMEOUT_MS },
-        )
-      : Promise.resolve(skipped('nothing to store')),
-  ]);
+  const runNotion = (): Promise<SyncReport['destinations']['notion']> => {
+    if (!wanted('notion')) return Promise.resolve(skipped(NOT_RETRIED, 'not_retried'));
+    if (!notionWanted) {
+      return Promise.resolve(input.uploadDest === 'gdrive'
+        ? skipped('Notion not selected as a destination', 'not_selected')
+        : skipped('Notion not connected', 'not_connected'));
+    }
+    return runIsolated(
+      () => deps.notion.syncRecord({
+        ...input.notion,
+        profile: input.profile,
+        fields,
+        note: input.note,
+        image: archive,
+        audio: input.audio,
+        audioMimeType: input.audioMimeType,
+      }),
+      { module: 'notion', timeoutMs: DESTINATION_TIMEOUT_MS },
+    );
+  };
+
+  const runMedia = (): Promise<SyncReport['destinations']['media']> => {
+    if (!wanted('media')) return Promise.resolve(skipped(NOT_RETRIED, 'not_retried'));
+    if (!imageForMedia && !audioForMedia) return Promise.resolve(skipped('nothing to store', 'nothing_to_store'));
+    return runIsolated(
+      () => deps.media.storeMedia({
+        accessToken: input.caller.accessToken,
+        isGuest: input.caller.isGuest,
+        profileId: input.profile.id,
+        image: imageForMedia,
+        audio: audioForMedia,
+        audioMimeType: input.audioMimeType,
+      }),
+      { module: 'media', timeoutMs: DESTINATION_TIMEOUT_MS },
+    );
+  };
+
+  const [notion, media] = await Promise.all([runNotion(), runMedia()]);
 
   if (notion.status === 'ok') warnings.push(...notion.value.attachmentNotes);
   if (media.status === 'ok') warnings.push(...media.value.notes);
@@ -142,7 +157,7 @@ export async function syncDocument(input: SyncInput, deps: SyncDeps = defaultDep
   const otherFailures = [notion.status === 'failed' ? 'Notion' : null, media.status === 'failed' ? 'media upload' : null].filter(Boolean);
 
   // 3) Sheets.
-  const sheets = await runIsolated(
+  const sheets = !wanted('sheets') ? skipped(NOT_RETRIED, 'not_retried') : await runIsolated(
     () => deps.sheets.appendRecord({
       caller: input.caller,
       spreadsheetId: input.spreadsheetId,

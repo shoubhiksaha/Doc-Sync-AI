@@ -1,24 +1,27 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
+import { House, RotateCcw } from 'lucide-react';
+import { useI18n } from '@/client/i18n/I18nProvider';
+import { reportError } from '@/client/telemetry';
+import { Button, ButtonLink, Card } from './components/ui';
 
 export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const { t } = useI18n();
   useEffect(() => {
     console.error('[ui] page error:', error);
+    reportError(error, 'route', error.digest);
   }, [error]);
 
   return (
-    <main className="container" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="glass-panel" style={{ padding: '2rem', maxWidth: '440px', textAlign: 'center' }}>
-        <h2 style={{ marginBottom: '0.5rem' }}>This page hit a problem</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-          Other parts of DocSync are unaffected. You can retry, or go back to the home page.
-        </p>
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-          <button className="btn btn-primary" onClick={reset}>Try again</button>
-          <Link className="btn btn-secondary" href="/" style={{ textDecoration: 'none' }}>Home</Link>
-        </div>
+    <main id="main" className="container page">
+      <div style={{ maxWidth: 480, margin: '48px auto' }}>
+        <Card as="div" title={t('errorPage.title')} description={t('errorPage.body')}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button variant="primary" icon={<RotateCcw size={18} aria-hidden />} onClick={reset}>{t('common.retry')}</Button>
+            <ButtonLink href="/" icon={<House size={18} aria-hidden />}>{t('errorPage.home')}</ButtonLink>
+          </div>
+        </Card>
       </div>
     </main>
   );

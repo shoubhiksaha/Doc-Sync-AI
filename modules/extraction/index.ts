@@ -10,6 +10,8 @@ import { AIUnavailableError, aiCandidates, chatJson } from '@/modules/ai';
 import { validateFields, type DocumentProfile, type RecordField } from '@/modules/profiles';
 
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+/** Pages of one document sent together (e.g. a two-sided receipt or a multi-page PDF). */
+export const MAX_PAGES = 4;
 const MAX_FIELDS = 100;
 const CATEGORIES = new Set(['identity', 'financial', 'date', 'contact', 'metadata', 'other']);
 
@@ -26,7 +28,8 @@ export interface ExtractionResult {
 }
 
 export class ExtractionUnavailableError extends Error {
-  constructor(message: string, public readonly quotaLike: boolean) {
+  /** `input`: the upload itself is unusable (unreadable image, nothing sent) — retrying won't help. */
+  constructor(message: string, public readonly quotaLike: boolean, public readonly kind: 'service' | 'input' = 'service') {
     super(message);
     this.name = 'ExtractionUnavailableError';
   }
@@ -124,7 +127,10 @@ function mockResult(profile: DocumentProfile | undefined, stats: ExtractionResul
 }
 
 export interface ExtractInput {
-  document: Buffer;
+  /** Single-page input (kept for compatibility); ignored when `documents` is given. */
+  document?: Buffer;
+  /** Pages of the same document, in order; at most MAX_PAGES are used. */
+  documents?: Buffer[];
   profile?: DocumentProfile;
   /** Field labels from the user's saved template. */
   focusFields?: string[];
@@ -136,8 +142,15 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
     throw new ExtractionUnavailableError('Document extraction is temporarily disabled.', false);
   }
 
-  const image = await prepareImage(input.document);
-  const stats = { originalSize: input.document.length, processedSize: image.length };
+  const pages = (input.documents?.length ? input.documents : input.document ? [input.document] : []).slice(0, MAX_PAGES);
+  if (pages.length === 0) throw new ExtractionUnavailableError('No document was provided.', false, 'input');
+  const images = await Promise.all(pages.map(prepareImage)).catch(() => {
+    throw new ExtractionUnavailableError('This photo could not be opened. Please use a JPG or PNG photo.', false, 'input');
+  });
+  const stats = {
+    originalSize: pages.reduce((n, p) => n + p.length, 0),
+    processedSize: images.reduce((n, i) => n + i.length, 0),
+  };
 
   if (aiCandidates(input.customApiKey).length === 0) {
     return mockResult(input.profile, stats);
@@ -146,8 +159,8 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
   try {
     const { text, provider } = await chatJson({
       system: buildSystemPrompt(input.profile, input.focusFields ?? []),
-      user: `Extract ALL fields from this ${input.profile?.documentName ?? 'document'}. Be exhaustive.`,
-      images: [{ mimeType: 'image/jpeg', base64Data: image.toString('base64') }],
+      user: `Extract ALL fields from this ${input.profile?.documentName ?? 'document'}.${pages.length > 1 ? ` The ${pages.length} images are ${pages.length} pages of the same document, in order; return one combined field list.` : ''} Be exhaustive.`,
+      images: images.map(image => ({ mimeType: 'image/jpeg', base64Data: image.toString('base64') })),
       customApiKey: input.customApiKey,
     });
 
@@ -155,11 +168,11 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
     try {
       parsed = JSON.parse(text);
     } catch {
-      throw new ExtractionUnavailableError('The AI provider returned an unreadable response. Please try again.', false);
+      throw new ExtractionUnavailableError('The AI service gave an unreadable answer. Please try again.', false);
     }
     const fields = normalizeFields(parsed.fields);
     if (fields.length === 0) {
-      throw new ExtractionUnavailableError('No fields could be read from this document. Try a clearer, well-lit photo.', false);
+      throw new ExtractionUnavailableError('No details could be read from this document. Try a clearer, well-lit photo.', false);
     }
 
     return {
@@ -176,10 +189,12 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
       if (err.quotaLike && env('DEMO_FALLBACK_ON_AI_QUOTA') === 'true') {
         return mockResult(input.profile, stats, true);
       }
+      // Provider details go to the server log; the user gets a plain explanation.
+      console.error('[extraction] every AI provider failed:', err.message.slice(0, 1000));
       throw new ExtractionUnavailableError(
         err.quotaLike
-          ? 'AI provider quota/rate limit reached. Add another provider key (Groq/OpenAI/Gemini/Anthropic) or wait for the quota to reset.'
-          : `Extraction failed on every configured AI provider. Check the provider keys and model access. (${err.message.slice(0, 400)})`,
+          ? 'The AI service is busy or has reached its limit. Please try again in a few minutes, or add your own AI key in Settings.'
+          : 'The AI service could not read this document right now. Please try again in a minute.',
         err.quotaLike,
       );
     }

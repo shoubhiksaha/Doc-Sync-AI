@@ -64,4 +64,12 @@ describe('modules/media', () => {
     const out = await prepareArchiveImage(png);
     expect((await sharp(out).metadata()).format).toBe('webp');
   });
+
+  it('prepareArchiveImage keeps stacked multi-page scans tall enough to read', async () => {
+    const tall = await sharp({ create: { width: 1000, height: 4000, channels: 3, background: '#fff' } }).png().toBuffer();
+    const meta = await sharp(await prepareArchiveImage(tall)).metadata();
+    expect([meta.width, meta.height]).toEqual([1000, 4000]);
+    const wide = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#fff' } }).png().toBuffer();
+    expect((await sharp(await prepareArchiveImage(wide)).metadata()).width).toBe(1500);
+  });
 });
