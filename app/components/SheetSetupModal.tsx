@@ -14,19 +14,19 @@ export type SuggestedField = {
 
 interface SheetSetupModalProps {
   profileId: string;
+  sheetTitle: string;
   suggestedFields: SuggestedField[];
   onConfirm: (columns: { key: string; label: string }[], spreadsheetId: string, sheetUrl: string) => void;
   onCancel: () => void;
 }
 
-export default function SheetSetupModal({ profileId, suggestedFields, onConfirm, onCancel }: SheetSetupModalProps) {
+export default function SheetSetupModal({ profileId, sheetTitle, suggestedFields, onConfirm, onCancel }: SheetSetupModalProps) {
   const [fields, setFields] = useState<SuggestedField[]>(suggestedFields);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const sheetTitle = profileId === 'ngo-receipt' ? 'DocSync — NGO Receipts' : 'DocSync — Factory Weight Slips';
   const lowConfidenceCount = fields.filter(f => f.confidence < 75).length;
 
   function removeField(index: number) {

@@ -51,7 +51,9 @@ function SettingsContent() {
     });
 
     if (res.ok) {
-      toast.success('Settings securely saved!');
+      const data = await res.json().catch(() => ({}));
+      if (data.warning) toast(data.warning, { icon: '⚠️' });
+      else toast.success('Settings securely saved!');
     } else {
       toast.error('Failed to save settings.');
     }
@@ -74,6 +76,7 @@ function SettingsContent() {
             <li><strong>Google Gemini</strong> (FREE! Starts with <code>AIzaSy...</code>) — Highly recommended for accurate OCR.</li>
             <li><strong>Groq</strong> (FREE! Starts with <code>gsk_...</code>) — Blazing fast LLaMA Vision and Whisper.</li>
             <li><strong>OpenAI</strong> (Paid, starts with <code>sk-...</code> or <code>proj-...</code>) — Full support for GPT-4o and Whisper.</li>
+            <li><strong>Anthropic Claude</strong> (Paid, starts with <code>sk-ant-...</code>) — Document extraction (voice notes then use the server&apos;s keys).</li>
           </ul>
           <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', fontSize: '0.8rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
             💡 <strong>Get a free key:</strong> Go to <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Groq Console</a> or <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>Google AI Studio</a>. Our <strong>UniversalAIAdapter</strong> will automatically detect which provider your key belongs to!
@@ -114,9 +117,11 @@ function SettingsContent() {
             {notionKey === '********' ? (
               <div style={{ padding: '1rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)' }}>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Your Notion workspace is securely connected via OAuth.</p>
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth redirect route; needs a full page load, not client navigation */}
                 <a href="/api/auth/notion" style={{ fontSize: '0.8rem', color: 'var(--primary)', textDecoration: 'underline' }}>Reconnect or change workspace</a>
               </div>
             ) : (
+              // eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth redirect route; needs a full page load, not client navigation
               <a href="/api/auth/notion" className="btn btn-primary" style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"></path><path d="M4 8h16"></path><path d="M8 4v4"></path></svg>
                 Connect to Notion

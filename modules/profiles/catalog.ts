@@ -1,0 +1,31 @@
+import type { ComingSoonProfile } from './types';
+
+/** Planned profiles shown as "Coming Soon" on the home page. Moving one to active = adding a profile file. */
+export const comingSoonProfiles: ComingSoonProfile[] = [
+  { title: 'Fleet Fuel & Petty Cash', description: 'Parse logistics fuel slips, toll receipts, and driver petty cash notes.' },
+  { title: 'Construction Material Inward', description: 'Digitize sand/cement inward challans for site inventory reconciliation.' },
+  { title: 'Kirana Store Khatas', description: 'Convert handwritten credit ledgers into structured customer balance sheets.' },
+  { title: 'Mandi Auction Slips', description: 'Extract crop type, farmer name, weight, and bid price from APMC mandi slips.' },
+  { title: 'Transport Lorry Receipts (LR)', description: 'Digitize consignor, consignee, e-way bill number, and freight amounts.' },
+  { title: 'Dairy Collection Slips', description: 'Parse milk weight, fat percentage, SNF, and rate per liter from local dairy chits.' },
+  { title: 'Handloom Weaver Logs', description: 'Digitize yarn consumed, meters woven, and piece-rate wage calculations.' },
+  { title: 'Brick Kiln Token Slips', description: 'Count bricks molded, baked, and dispatched using daily worker tokens.' },
+  { title: 'Medical Store Prescriptions', description: 'Convert handwritten doctor notes to structured medicine order lists.' },
+  { title: 'Jewelry Making (K कारीगरी) Logs', description: 'Track raw gold issued, wastage, and finished ornament weight.' },
+  { title: 'Tailoring Measurement Books', description: 'Digitize customer measurements and fabric details for boutique management.' },
+  { title: 'Caterer Raw Material Bills', description: 'Parse sabzi mandi and wholesale grocery handwritten invoices.' },
+  { title: 'Daily Wage Muster Rolls', description: 'Extract worker attendance, half-days, and daily payouts from register photos.' },
+  { title: 'Scrap Dealer (Kabadiwala) Rates', description: 'Parse daily rate cards and collection weight receipts by material type.' },
+  { title: 'Garage Repair Estimates', description: 'Digitize handwritten mechanic quotes for spare parts and labor.' },
+  { title: 'Agriculture Pesticide Bills', description: 'Track fertilizers, seed varieties, and agrochemical purchases for farm accounting.' },
+  { title: 'Fish Market Auction Chits', description: 'Parse boat name, catch type, weight, and wholesale bid amounts.' },
+  { title: 'Event Decorator Challans', description: 'Track chairs, tents, and lighting equipment rented out and returned.' },
+  { title: 'Cable TV / WiFi Collection Receipts', description: 'Digitize monthly subscription payments collected door-to-door.' },
+  { title: 'Ration Shop (PDS) Distribution Logs', description: 'Parse family ration card numbers and grain quantities disbursed.' },
+  { title: 'Handicraft Artisan Piece-rate Cards', description: 'Digitize items produced, quality checks, and payment due.' },
+  { title: 'Local Courier Delivery Run-sheets', description: 'Extract tracking numbers, receiver signatures, and COD collected.' },
+  { title: 'Godown Storage Receipts', description: 'Parse farmer name, commodity, bag count, and storage duration.' },
+  { title: 'Timber Mart Measurement Slips', description: 'Digitize wood type, logs count, length, girth, and cubic feet volume.' },
+  { title: 'Mobile Repair Job Cards', description: 'Extract customer issue, IMEI, spare part used, and total repair cost.' },
+  { title: 'Street Vendor Daily Finance', description: 'Digitize micro-loan collections (daily bishi/chit fund payments).' },
+];

@@ -57,6 +57,7 @@ export default function InitialSetupModal() {
             >
               Skip (Google Drive Only)
             </button>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth redirect route; needs a full page load, not client navigation */}
             <a 
               href="/api/auth/notion"
               style={{

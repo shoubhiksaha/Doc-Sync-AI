@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 export default function Navbar() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
 
   // Hide navbar on the login page
@@ -35,9 +35,13 @@ export default function Navbar() {
               </div>
             )}
             <button 
-              onClick={() => {
-                document.cookie = "docsync_guest=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                signOut({ callbackUrl: '/login' });
+              onClick={async () => {
+                await fetch('/api/auth/guest', { method: 'DELETE' }).catch(() => undefined);
+                if (session) {
+                  signOut({ callbackUrl: '/login' });
+                } else {
+                  window.location.href = '/login';
+                }
               }}
               style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
             >
@@ -48,7 +52,7 @@ export default function Navbar() {
       </nav>
 
       {/* Demo Mode Banner */}
-      {!session && (
+      {status === 'unauthenticated' && (
         <div style={{ 
           backgroundColor: 'rgba(255, 165, 0, 0.1)', 
           borderBottom: '1px solid rgba(255, 165, 0, 0.3)',
@@ -57,9 +61,9 @@ export default function Navbar() {
           fontSize: '0.9rem',
           color: 'var(--text-secondary)'
         }}>
-          <strong style={{ color: 'orange' }}>⚠️ Demo Mode Active:</strong> You are currently editing a single, pre-existing global Google Sheet and media is hosted via Catbox.moe for demonstration purposes. 
+          <strong style={{ color: 'orange' }}>⚠️ Demo Mode Active:</strong> Data goes to one shared demo Google Sheet that other demo users can see. Please don&apos;t scan real personal documents.
           <br/>
-          If you <strong>Log In with Google</strong>, the app will dynamically create brand new spreadsheets in your personal Google Drive and securely store all extracted images and audio there!
+          If you <strong>Log In with Google</strong>, the app creates private spreadsheets in your own Google Drive and stores the images and audio there.
         </div>
       )}
     </div>

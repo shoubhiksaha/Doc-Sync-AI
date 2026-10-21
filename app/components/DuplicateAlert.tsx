@@ -8,9 +8,11 @@ type DuplicateAlertProps = {
   primaryKeyValue: string;
   onAction: (action: DuplicateAction) => void;
   onCancel: () => void;
+  /** Replacing rows needs a signed-in user; demo users can only keep both. */
+  allowReplace?: boolean;
 };
 
-export default function DuplicateAlert({ duplicateCount, primaryKeyLabel, primaryKeyValue, onAction, onCancel }: DuplicateAlertProps) {
+export default function DuplicateAlert({ duplicateCount, primaryKeyLabel, primaryKeyValue, onAction, onCancel, allowReplace = true }: DuplicateAlertProps) {
   return (
     <div style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
@@ -28,16 +30,18 @@ export default function DuplicateAlert({ duplicateCount, primaryKeyLabel, primar
           </span>
         </p>
         
-        {duplicateCount > 1 && (
+        {allowReplace && duplicateCount > 1 && (
           <div style={{ fontSize: '0.8rem', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', padding: '0.5rem', borderRadius: '4px', marginBottom: '1.5rem' }}>
             Warning: Selecting &quot;Replace&quot; will overwrite all {duplicateCount} matching records.
           </div>
         )}
 
         <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
-          <button className="btn btn-primary" onClick={() => onAction('replace')}>
-            Replace Existing Record{duplicateCount > 1 ? 's' : ''}
-          </button>
+          {allowReplace && (
+            <button className="btn btn-primary" onClick={() => onAction('replace')}>
+              Replace Existing Record{duplicateCount > 1 ? 's' : ''}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => onAction('keep_both')}>
             Keep Both (Force Sync)
           </button>

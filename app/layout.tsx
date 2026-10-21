@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 import Navbar from "./components/Navbar";
+import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 
 const geist = localFont({
   src: "./fonts/GeistVF.woff",
@@ -10,8 +11,8 @@ const geist = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "DocSync AI - Zero Storage Document Ingestion",
-  description: "Agentic Document Ingestion Pipeline for MSMEs and NGOs. Extract structured data with zero data storage.",
+  title: "DocSync AI - Document Ingestion for Sheets & Notion",
+  description: "Agentic document ingestion for MSMEs and NGOs. Extract structured data from paper documents into your own Google Sheets and Notion.",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
@@ -48,6 +49,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           {children}
+          <ServiceWorkerRegister />
         </Providers>
       </body>
     </html>

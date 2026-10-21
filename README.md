@@ -9,34 +9,47 @@ DocSync AI is a full-stack, mobile-first web app (PWA) designed to eliminate man
 **Track 6: AI Agents for Bharat's Businesses**
 
 ## Prerequisites
-* **Demo Mode:** Deploys and runs the full demo with NO login and NO API key required from the user. It uses server-side environment variables and seeded storage for a zero-friction demo experience.
-* **Live Mode (Optional):** Requires a Google OAuth Client ID, a Google Service Account (for background Sheets syncing), and an `OPENAI_API_KEY` (or Groq/Gemini key) to power the extraction engine dynamically per-user.
+* **Demo Mode:** Runs the full flow with NO login and NO API key from the user. Demo users get a signed, rate-limited session that uses the server's AI keys (within `DEMO_DAILY_AI_LIMIT`) and writes to one shared demo Google Sheet. Images and voice notes are not stored in demo mode.
+* **Live Mode (Optional):** Requires a Google OAuth client. Signed-in users get their own private spreadsheets and Drive folder, and can bring their own Gemini / Groq / OpenAI / Anthropic key.
+
+All variables are documented in [`.env.example`](./.env.example).
 
 ## Run Locally
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Run the development server
-npm run dev
+npm run dev            # http://localhost:3000 → "Try Demo Mode (No Login)"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser. Click **"Try Demo Mode (No Login)"** to test the complete extraction and sync workflow instantly.
+Checks (the same ones CI runs):
 
-## Vercel Deploy (5-Minute Guide)
-1. Push this repository to GitHub.
-2. Go to [Vercel](https://vercel.com) and click **"Add New Project"**.
-3. Import your GitHub repository.
-4. In the **Environment Variables** section, copy and paste the contents of `.env.example`. Replace the placeholder values for `OPENAI_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, and `GOOGLE_PRIVATE_KEY` with real values to ensure Demo Mode works globally.
-5. Click **Deploy**. Your app will be live and ready for testing in under 5 minutes.
+```bash
+npm run lint && npm run typecheck
+npm run test:coverage
+npm run build && npm run test:e2e   # Playwright smoke tests against the production build
+npm run setup:hooks                 # local pre-push guard (secret scan, no direct pushes to main/staging)
+```
+
+## Architecture
+
+DocSync is split into independent modules — `ai`, `extraction`, `transcription`, `sheets`, `notion`, `media`, `settings`, `profiles` and the `sync` orchestrator — each with one public entry point. Every call between them has a timeout, a kill switch (`MODULE_<NAME>=off`) and a circuit breaker, so **a failure in one module never takes down the others**: if Notion is down, rows still reach Google Sheets; if transcription fails, scanning still works. `GET /api/health` reports the state of every module.
+
+Each document type (NGO receipts, factory weight slips, …) is a self-contained profile in `modules/profiles/`, so a document type can be added or changed without touching the rest.
+
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+## Deployment
+
+Deploys run only from GitHub Actions, with the same release flow as AI Planner: feature branch → PR into `staging` (tests, owner approval, deploy to the Vercel staging environment, contract tests) → the same branch → PR into `main` (staging-provenance check, tests, owner approval, production deploy, contract tests). Staging never merges into main.
+
+See [docs/RELEASE_FLOW.md](./docs/RELEASE_FLOW.md), [docs/release_checklist.md](./docs/release_checklist.md) and [docs/branch_protection.md](./docs/branch_protection.md).
 
 ## How Codex Built This
 * **Hackathon Transparency Statement:** Planning, wireframes, and architecture were done using free external tools; all application code was generated and iterated on with Codex.
 
 Codex orchestrated this entire application, from the Next.js App Router scaffolding to the complex multi-modal AI abstractions. 
-* **Multi-model Architecture:** Built a `UniversalAIAdapter` that seamlessly routes between OpenAI, Groq, and Gemini, providing automatic fallback logic.
+* **Multi-model Architecture:** Built a `UniversalAIAdapter` that routes between OpenAI, Groq, Gemini and Anthropic, with automatic fallback to the next provider on any error.
 * **Serverless Resiliency:** Solved Next.js serverless limitations by implementing client-side image compression (`HTML5 Canvas`), entirely bypassing Vercel's strict 4.5MB payload limits before hitting the backend.
-* **Seamless Testing:** Implemented a robust "Demo Mode" that dynamically mocks Google OAuth and Google Drive scopes so hackathon judges can test the full PWA without a single configuration step.
+* **Seamless Testing:** A "Demo Mode" with signed guest sessions and a shared demo sheet, so hackathon judges can test the full PWA without a single configuration step.
 
 
