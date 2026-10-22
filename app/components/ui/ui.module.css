@@ -335,7 +335,7 @@
 }
 
 .stepCurrent .stepDot {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   background: var(--accent);
   color: var(--on-accent);
 }

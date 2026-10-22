@@ -1,46 +1,50 @@
 /*
- * Design tokens. Every colour pair used for text meets WCAG AA (4.5:1) on the surfaces it sits on,
- * and input borders meet the 3:1 non-text contrast rule. Components use these tokens only.
+ * Design tokens: the ADT brand palette and type (DocSync AI is an offering by ADT; source:
+ * ADT Papers/brand/web-theme/adt-tokens.css). Every colour pair used for text meets WCAG AA (4.5:1)
+ * on the surfaces it sits on, and input borders meet the 3:1 non-text rule. Signal Aqua is a fill
+ * only on light surfaces (1.4:1 on white); aqua text, borders and focus rings use --accent-text.
+ * Components use these tokens only.
  */
 :root {
   color-scheme: light;
 
-  --bg: #f7f7fb;
+  --bg: #f4f6f5;
   --surface: #ffffff;
-  --surface-2: #f3f4f6;
-  --border: #e5e7eb;
-  --border-strong: #868e96;
+  --surface-2: #e9edeb;
+  --border: #dce1df;
+  --border-strong: #7a8480;
 
-  --text: #111827;
-  --text-2: #374151;
-  --text-muted: #5f6672;
+  --text: #0a0a0a;
+  --text-2: #4e5653;
+  --text-muted: #626b67;
 
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef2ff;
-  --accent-text: #4338ca;
-  --on-accent: #ffffff;
+  --accent: #01f9c9;
+  --accent-hover: #00ddb2;
+  --accent-soft: #d6fdf4;
+  --accent-text: #00735c;
+  --on-accent: #0a0a0a;
 
-  --success: #047857;
-  --success-soft: #ecfdf5;
-  --warning: #b45309;
-  --warning-soft: #fffbeb;
-  --danger: #b91c1c;
-  --danger-soft: #fef2f2;
+  --success: #0b5fa8;
+  --success-soft: #e8f1fa;
+  --warning: #8a5a00;
+  --warning-soft: #fdf5e6;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
 
-  --focus: #4f46e5;
-  --overlay: rgba(15, 23, 42, 0.55);
+  --focus: #00735c;
+  --overlay: rgba(10, 10, 10, 0.55);
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.16);
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.06);
+  --shadow-md: 0 1px 2px rgba(10, 10, 10, 0.06), 0 8px 24px rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 16px 40px rgba(10, 10, 10, 0.14);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
   --radius-lg: 16px;
   --radius-full: 9999px;
 
-  --font-sans: var(--font-geist-sans), system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
+  --font-sans: var(--font-body), 'IBM Plex Sans', 'Helvetica Neue', Arial, 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
+  --font-display: var(--font-heading), 'Space Grotesk', 'Helvetica Neue', Arial, 'Noto Sans Devanagari', sans-serif;
   --gutter: 16px;
   --content: 1120px;
   --bar-height: 76px;
@@ -50,34 +54,34 @@
   :root {
     color-scheme: dark;
 
-    --bg: #0f172a;
-    --surface: #1e293b;
-    --surface-2: #273449;
-    --border: #334155;
-    --border-strong: #7083a0;
+    --bg: #0a0a0a;
+    --surface: #121514;
+    --surface-2: #1a1f1d;
+    --border: #262c2a;
+    --border-strong: #6b7571;
 
-    --text: #f1f5f9;
-    --text-2: #cbd5e1;
-    --text-muted: #94a3b8;
+    --text: #f2f5f4;
+    --text-2: #a3ada9;
+    --text-muted: #868f8b;
 
-    --accent: #4f46e5;
-    --accent-hover: #4338ca;
-    --accent-soft: rgba(99, 102, 241, 0.18);
-    --accent-text: #a5b4fc;
+    --accent: #01f9c9;
+    --accent-hover: #66ffe0;
+    --accent-soft: #0b2e27;
+    --accent-text: #01f9c9;
 
-    --success: #34d399;
-    --success-soft: rgba(16, 185, 129, 0.14);
-    --warning: #fbbf24;
-    --warning-soft: rgba(245, 158, 11, 0.14);
-    --danger: #f87171;
-    --danger-soft: rgba(239, 68, 68, 0.14);
+    --success: #6cc4ff;
+    --success-soft: rgba(108, 196, 255, 0.14);
+    --warning: #f5b83d;
+    --warning-soft: rgba(245, 184, 61, 0.14);
+    --danger: #ff7a6b;
+    --danger-soft: rgba(255, 122, 107, 0.14);
 
-    --focus: #a5b4fc;
-    --overlay: rgba(2, 6, 23, 0.7);
+    --focus: #01f9c9;
+    --overlay: rgba(0, 0, 0, 0.7);
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -98,7 +102,10 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* A column, so the ADT footer sits at the bottom of short pages. */
 body {
+  display: flex;
+  flex-direction: column;
   min-height: 100dvh;
   font-family: var(--font-sans);
   font-size: 1rem;
@@ -109,6 +116,7 @@ body {
 }
 
 h1, h2, h3, h4 {
+  font-family: var(--font-display);
   line-height: 1.25;
   letter-spacing: -0.015em;
   color: var(--text);
@@ -140,6 +148,10 @@ button {
 
 ::selection {
   background: var(--accent-soft);
+}
+
+body > main {
+  flex: 1 0 auto;
 }
 
 .container {

@@ -134,6 +134,13 @@ The UI follows the same idea: small parts with clear contracts.
   layout checks on desktop and phone viewports in CI.
 - **Language:** English and Hindi (`docsync_lang` cookie, toggle in the navbar). `hi.ts` is typed
   against `en.ts`, and a unit test checks every placeholder matches.
+- **Brand:** DocSync AI is an offering by ADT (Analog Digital Technologies). The tokens use ADT's
+  palette (Signal Aqua `#01F9C9`, Deep Black `#0A0A0A`) and type (Space Grotesk headings, IBM Plex
+  Sans text). On light surfaces aqua is only a fill under black text; aqua text, thin borders and
+  focus rings use `--accent-text` (`#00735C`). "An offering by ADT" (`app/components/AdtEndorsement.tsx`)
+  is stacked under the sign-in card and one line at the bottom of every other page and
+  `offline.html`, and links to analogdigital.tech. The SVGs in `public/brand/` come unchanged from
+  ADT's brand kit (`ADT Papers/brand/logo/final/endorsement`); replace them from there, never edit them.
 
 ## Changing things independently
 
@@ -144,7 +151,8 @@ The UI follows the same idea: small parts with clear contracts.
   `GEMINI_VISION_MODEL`, `GROQ_VISION_MODEL`, `ANTHROPIC_VISION_MODEL` per environment.
 - **Change how Sheets lays out rows:** `modules/sheets/a1.ts` (pure functions, fully unit-tested).
 - **Change copy or add a language:** `client/i18n/` (add a dictionary typed `Record<MessageKey, string>`).
-- **Change the look:** tokens in `app/globals.css`, components in `app/components/ui/`.
+- **Change the look:** tokens in `app/globals.css` (ADT's palette; see Brand above), components in
+  `app/components/ui/`.
 - **Add a destination:** create `modules/<name>/` with an `index.ts` and a `<name>Health()`, add it
   to the orchestrator in `modules/sync` behind `runIsolated()`, and to `/api/health`.
 

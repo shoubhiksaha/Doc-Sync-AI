@@ -36,8 +36,9 @@ or schema-suggestion endpoint.
 ## User interface
 The scan flow (`client/scan-flow.ts`, `app/scan/[profile]/`) is a small state machine: photo →
 reading → check → saved. Remembered fields and the duplicate-check field are per-profile
-preferences (`/api/profile-prefs`). Copy lives in `client/i18n/` (English and Hindi). See the UI
-section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
+preferences (`/api/profile-prefs`). Copy lives in `client/i18n/` (English and Hindi). DocSync AI is
+an offering by ADT: it uses ADT's colours and type, and every screen carries the "An offering by ADT"
+badge. See the UI section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
 
 ## Resilience & Persistence
 The agents are stateless. Signed-in users' keys come from encrypted cookies or (optionally)

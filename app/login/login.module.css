@@ -1,8 +1,10 @@
 .page {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 24px;
   min-height: 100dvh;
   padding: 72px var(--gutter) 32px;
 }

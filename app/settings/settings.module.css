@@ -54,8 +54,13 @@
 }
 
 .option:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   background: var(--accent-soft);
+}
+
+/* Muted grey is under 4.5:1 on the dark aqua tint, so the hint reads in the secondary colour here. */
+.option:has(input:checked) .hint {
+  color: var(--text-2);
 }
 
 .option input {
@@ -63,7 +68,7 @@
   width: 20px;
   height: 20px;
   margin-top: 2px;
-  accent-color: var(--accent);
+  accent-color: var(--accent-text);
 }
 
 .option > span {

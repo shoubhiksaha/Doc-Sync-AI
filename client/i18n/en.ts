@@ -26,6 +26,8 @@ export const en = {
   'nav.switchLanguageLabel': 'Switch to Hindi',
   'nav.account': 'Your account',
 
+  'brand.offering': 'An offering by ADT, Analog Digital Technologies. Opens analogdigital.tech in a new tab',
+
   'login.tagline': 'Photograph paper receipts and slips. DocSync reads them and adds a row to your Google Sheet.',
   'login.google': 'Sign in with Google',
   'login.where': 'Rows go to a private sheet in your own Google Drive, together with the photos and voice notes.',

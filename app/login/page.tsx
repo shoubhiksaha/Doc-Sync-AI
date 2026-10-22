@@ -2,6 +2,7 @@
 import { signIn } from 'next-auth/react';
 import { Languages } from 'lucide-react';
 import { useI18n } from '@/client/i18n/I18nProvider';
+import { AdtEndorsement } from '@/app/components/AdtEndorsement';
 import styles from './login.module.css';
 
 /** Google's multi-colour "G" mark, as required by the Sign in with Google branding guidelines. */
@@ -44,6 +45,8 @@ export default function LoginPage() {
 
         <p className={styles.footer}>{t('home.footer')}</p>
       </div>
+
+      <AdtEndorsement variant="stacked" />
     </main>
   );
 }

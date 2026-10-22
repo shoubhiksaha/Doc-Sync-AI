@@ -3,17 +3,31 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { Providers } from './providers';
 import Navbar from './components/Navbar';
+import AdtFooter from './components/AdtEndorsement';
 import ServiceWorkerRegister from './components/ServiceWorkerRegister';
 import { serverI18n } from '@/client/i18n/server';
 
-const geist = localFont({
-  src: './fonts/GeistVF.woff',
-  variable: '--font-geist-sans',
+// ADT brand type: IBM Plex Sans for text, Space Grotesk for headings (SIL Open Font License).
+const body = localFont({
+  src: [
+    { path: './fonts/IBMPlexSans-400.woff2', weight: '400' },
+    { path: './fonts/IBMPlexSans-600.woff2', weight: '600' },
+  ],
+  variable: '--font-body',
+});
+
+const heading = localFont({
+  src: './fonts/SpaceGrotesk-700.woff2',
+  weight: '700',
+  variable: '--font-heading',
 });
 
 export const metadata: Metadata = {
   title: 'DocSync AI: paper documents to Google Sheets & Notion',
   description: 'Photograph receipts, slips and registers. DocSync reads them, you check the details, and a row is added to your own Google Sheet or Notion.',
+  applicationName: 'DocSync AI',
+  authors: [{ name: 'Analog Digital Technologies (ADT)', url: 'https://analogdigital.tech' }],
+  publisher: 'Analog Digital Technologies (ADT)',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -33,19 +47,20 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+    { media: '(prefers-color-scheme: dark)', color: '#121514' },
   ],
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { lang, t } = await serverI18n();
   return (
-    <html lang={lang} className={geist.variable}>
+    <html lang={lang} className={`${body.variable} ${heading.variable}`}>
       <body>
         <a href="#main" className="skip-link">{t('nav.skip')}</a>
         <Providers lang={lang}>
           <Navbar />
           {children}
+          <AdtFooter />
         </Providers>
         <ServiceWorkerRegister />
       </body>

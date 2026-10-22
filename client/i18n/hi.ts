@@ -24,6 +24,8 @@ export const hi: Record<MessageKey, string> = {
   'nav.switchLanguageLabel': 'अंग्रेज़ी में बदलें',
   'nav.account': 'आपका खाता',
 
+  'brand.offering': 'ADT (एनालॉग डिजिटल टेक्नोलॉजीज़) की पेशकश। analogdigital.tech नए टैब में खुलेगा',
+
   'login.tagline': 'काग़ज़ की रसीदों और पर्चियों की फ़ोटो लें। DocSync उन्हें पढ़कर आपकी Google शीट में एक पंक्ति जोड़ देता है।',
   'login.google': 'Google से साइन इन करें',
   'login.where': 'पंक्तियाँ आपकी अपनी Google Drive की निजी शीट में जाती हैं, फ़ोटो और वॉइस नोट के साथ।',
