@@ -5,9 +5,11 @@ jest.mock('@/modules/sync', () => ({
   ...jest.requireActual('@/modules/sync'),
   syncDocument: (...a: unknown[]) => syncDocument(...a),
 }));
+const settingsHealth = jest.fn();
 jest.mock('@/modules/settings', () => ({
   ...jest.requireActual('@/modules/settings'),
   loadSettings: jest.fn(async () => ({ uploadDest: 'both' })),
+  settingsHealth: (...a: unknown[]) => settingsHealth(...a),
 }));
 
 import { NextRequest } from 'next/server';
@@ -35,6 +37,7 @@ describe('API routes', () => {
     process.env = { ...saved, NEXTAUTH_SECRET: SECRET };
     getToken.mockReset().mockResolvedValue(null);
     syncDocument.mockReset();
+    settingsHealth.mockReset().mockImplementation(jest.requireActual('@/modules/settings').settingsHealth);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterAll(() => { process.env = saved; });
@@ -48,6 +51,19 @@ describe('API routes', () => {
     expect(body).toMatchObject({ environment: 'staging', version: 'sha123' });
     expect(Object.keys(body.modules).sort()).toEqual(['ai', 'extraction', 'media', 'notion', 'settings', 'sheets', 'transcription']);
     expect(['ok', 'degraded']).toContain(body.status);
+  });
+
+  it('GET /api/health is degraded while settings storage is unreachable, and never shows internal errors', async () => {
+    settingsHealth.mockResolvedValue({ enabled: true, configured: true, persistent: false, persistence: 'unreachable', circuit: 'open' });
+    let body = await (await health()).json();
+    expect(body.status).toBe('degraded');
+    expect(body.modules.settings).toMatchObject({ persistent: false, persistence: 'unreachable', circuit: 'open' });
+
+    settingsHealth.mockRejectedValue(new Error('7 PERMISSION_DENIED in project docsyncai1, see https://console.developers.google.com'));
+    body = await (await health()).json();
+    expect(body.modules.settings).toEqual({ enabled: false, configured: false, circuit: 'open', error: 'health check failed' });
+    expect(JSON.stringify(body)).not.toMatch(/docsyncai1|PERMISSION_DENIED|https:/);
+    expect(body.status).toBe('degraded');
   });
 
   it('sync rejects anonymous callers (including leftover demo cookies) and unknown profiles', async () => {

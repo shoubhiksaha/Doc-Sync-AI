@@ -209,6 +209,7 @@ export const en = {
   'settings.sync.title': 'Use my settings on all my devices',
   'settings.sync.on': 'Your AI key and preferences are stored encrypted in your account and follow you to any device you sign in on.',
   'settings.sync.off': 'Your AI key and preferences stay on this device only, in an encrypted cookie.',
+  'settings.sync.unavailable': "Using your settings on other devices isn't available right now. Your AI key and preferences are kept on this device, in an encrypted cookie.",
   'settings.profiles.title': 'Remembered fields',
   'settings.profiles.body': 'Fields DocSync fills in for each document type.',
   'settings.profiles.none': 'Nothing remembered yet',

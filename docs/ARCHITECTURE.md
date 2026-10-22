@@ -64,7 +64,7 @@ middleware.ts         Auth gate (Google session required), rate limits on every 
 | Profiles | `deriveFields()` / `validateFields()` catch profile bugs | A broken weight-slip validator shows a warning; NGO receipts are untouched |
 | UI | Route `error.tsx` boundaries + `<ModuleBoundary>` around panels | The voice-note panel crashing hides only that panel |
 | Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings) | During a Notion incident, set `MODULE_NOTION=off` in Vercel and redeploy the same build — no code change |
-| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state | Post-deploy contract tests and uptime checks read it |
+| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state; `settings.persistence` is `ok`, `unreachable` (credentials set but Firestore doesn't answer, e.g. API disabled or database missing; reported as `degraded`) or `not_configured`. Firestore is probed with one small read at most once a minute, and a failing Firestore is skipped and logged once a minute, not on every request. No internal error text is ever in the response | Post-deploy contract tests and uptime checks read it |
 
 ### The sync flow
 
@@ -104,7 +104,7 @@ saved preference, else the profile's `duplicateKey` (`''` saved by the user turn
 | Route | Contract |
 |---|---|
 | `POST /api/extract-freeform` | 1–4 `document` entries = pages of one document (images; the client renders PDFs). All pages go to the model in one request. Errors return `{ error, code }` with `code` ∈ `bad_input`, `too_large`, `quota`, `unavailable`, `internal`; messages are plain language, provider details stay in server logs. |
-| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent`, `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`. Saved keys never leave the server. |
+| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent` (chosen *and* Firestore is answering), `syncAvailable` (Firestore is answering; the Settings page disables the choice otherwise), `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`. Saved keys never leave the server. |
 | `POST /api/settings` | Partial update: only fields present change; `''` removes a value. Persistent mode changes only when `persistent` is sent. |
 | `GET/POST /api/profile-prefs` | Per-profile `fields` (remembered field list, `null` = review every scan) and `primaryKey` (`null` = profile default, `''` = no duplicate check), plus `defaultPrimaryKey`. Stored in the encrypted `docsync_prefs` cookie and, in persistent mode, in Firestore `users/{email}.profilePrefs`. |
 | `POST /api/telemetry` | `{ event, props }` or `{ events: [...] }` (≤ 20). Unknown events/props are dropped, strings capped, emails and 6+ digit runs scrubbed; each event becomes one `{"type":"telemetry",…}` log line with the caller kind only. Own rate-limit group. Returns 204. |

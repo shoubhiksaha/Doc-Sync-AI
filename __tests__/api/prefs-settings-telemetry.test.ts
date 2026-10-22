@@ -1,6 +1,10 @@
 const getToken = jest.fn();
 jest.mock('next-auth/jwt', () => ({ getToken: (...a: unknown[]) => getToken(...a) }));
-jest.mock('@/modules/settings/firestore', () => ({ getDb: () => null, firestoreConfigured: () => false }));
+jest.mock('@/modules/settings/firestore', () => ({
+  firestoreForRequest: () => null,
+  firestoreState: async () => 'not_configured',
+  reportFirestore: () => undefined,
+}));
 
 import { NextRequest } from 'next/server';
 import { GET as getPrefs, POST as savePrefs } from '@/app/api/profile-prefs/route';
@@ -34,7 +38,7 @@ describe('settings, profile-prefs and telemetry routes', () => {
     it('GET returns a masked key and its provider, and needs a signed-in caller', async () => {
       const res = await getSettings(req('/api/settings', { cookie: `docsync_openai=${encrypt('gsk_0123456789abcdefWXYZ')}` }));
       const body = await res.json();
-      expect(body).toMatchObject({ hasOpenAiKey: true, aiKeyHint: 'gsk_…WXYZ', aiProvider: 'groq' });
+      expect(body).toMatchObject({ hasOpenAiKey: true, aiKeyHint: 'gsk_…WXYZ', aiProvider: 'groq', isPersistent: false, syncAvailable: false });
       expect(body).not.toHaveProperty('isGuest');
       expect(JSON.stringify(body)).not.toContain('0123456789');
 
