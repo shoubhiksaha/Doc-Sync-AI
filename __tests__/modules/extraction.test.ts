@@ -73,7 +73,8 @@ describe('modules/extraction', () => {
 
   it('maps all-providers-out-of-quota to a quota error, never to sample data', async () => {
     process.env.OPENAI_API_KEY = 'sk-x';
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429, text: async () => 'quota' });
+    // A daily quota names a long wait, so the request fails at once instead of retrying.
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429, text: async () => 'quota', headers: new Headers({ 'retry-after': '3600' }) });
     const err = await extractFields({ document: image, profile: ngo }).catch(e => e);
     expect(err).toBeInstanceOf(ExtractionUnavailableError);
     expect(err.quotaLike).toBe(true);
