@@ -1,4 +1,4 @@
-import { aiHealth, AIUnavailableError, chatJson, detectProvider, isQuotaLike, providerCandidates } from '@/modules/ai';
+import { aiHealth, AIUnavailableError, chatJson, detectProvider, isQuotaLike, parseRetryAfter, providerCandidates } from '@/modules/ai';
 import { BREAKER_THRESHOLD, resetBreakers } from '@/core/isolation';
 
 const KEYS = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'MODULE_AI'];
@@ -6,8 +6,11 @@ const KEYS = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API
 function okResponse(content: string) {
   return { ok: true, json: async () => ({ choices: [{ message: { content } }] }) };
 }
-function errResponse(status: number, body = '') {
-  return { ok: false, status, text: async () => body };
+function geminiOk(text: string) {
+  return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) };
+}
+function errResponse(status: number, body = '', headers: Record<string, string> = {}) {
+  return { ok: false, status, text: async () => body, headers: new Headers(headers) };
 }
 
 describe('modules/ai', () => {
@@ -71,17 +74,17 @@ describe('modules/ai', () => {
 
     it('throws AIUnavailableError with every attempt when all fail', async () => {
       process.env.OPENAI_API_KEY = 'sk-x';
-      (global.fetch as jest.Mock).mockResolvedValue(errResponse(429, 'quota'));
+      (global.fetch as jest.Mock).mockResolvedValue(errResponse(429, 'quota exceeded. Please try again in 10m0s.'));
       const err = await chatJson({ system: 's', user: 'u' }).catch(e => e);
       expect(err).toBeInstanceOf(AIUnavailableError);
       expect(err.attempts).toHaveLength(1);
       expect(err.quotaLike).toBe(true);
     });
 
-    it('skips a server provider whose circuit is open', async () => {
+    it('skips a server provider whose circuit is open after repeated hard failures', async () => {
       process.env.OPENAI_API_KEY = 'sk-x';
       process.env.GEMINI_API_KEY = 'AIza-x';
-      (global.fetch as jest.Mock).mockResolvedValue(errResponse(500));
+      (global.fetch as jest.Mock).mockResolvedValue(errResponse(401, 'bad key'));
       for (let i = 0; i < BREAKER_THRESHOLD; i++) await chatJson({ system: 's', user: 'u' }).catch(() => undefined);
       (global.fetch as jest.Mock).mockClear();
       await chatJson({ system: 's', user: 'u' }).catch(() => undefined);
@@ -95,6 +98,117 @@ describe('modules/ai', () => {
       await expect(chatJson({ system: 's', user: 'u' })).rejects.toThrow('No AI provider is configured.');
       expect(global.fetch).not.toHaveBeenCalled();
     });
+  });
+
+  // Back-to-back scans: one scan can use up Groq's per-minute limit, and Gemini is often briefly
+  // overloaded. Busy must not look like broken.
+  describe('chatJson with busy providers', () => {
+    const fetchMock = () => global.fetch as jest.Mock;
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.spyOn(Math, 'random').mockReturnValue(0); // the extra pass waits exactly 2 s
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it('tries an overloaded provider once more after a short wait', async () => {
+      process.env.OPENAI_API_KEY = 'sk-x';
+      fetchMock().mockResolvedValueOnce(errResponse(503, 'overloaded')).mockResolvedValueOnce(okResponse('{"ok":true}'));
+      const pending = chatJson({ system: 's', user: 'u' });
+      await jest.advanceTimersByTimeAsync(1_999);
+      expect(fetchMock()).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toMatchObject({ provider: 'openai' });
+      expect(fetchMock()).toHaveBeenCalledTimes(2);
+    });
+
+    it('never pauses a provider for being busy, however often it happens', async () => {
+      process.env.OPENAI_API_KEY = 'sk-x';
+      fetchMock().mockResolvedValue(errResponse(503, 'overloaded'));
+      for (let i = 0; i < BREAKER_THRESHOLD + 1; i++) {
+        const pending = chatJson({ system: 's', user: 'u' }).catch(e => e);
+        await jest.advanceTimersByTimeAsync(2_000);
+        const err = await pending;
+        expect(err.quotaLike).toBe(true);
+        expect(err.attempts).toHaveLength(2);
+      }
+      expect(aiHealth().circuit).toBe('closed');
+      expect(fetchMock()).toHaveBeenCalledTimes(2 * (BREAKER_THRESHOLD + 1));
+    });
+
+    it('skips a rate-limited key for exactly the wait it named, using the next provider meanwhile', async () => {
+      process.env.GROQ_API_KEY = 'gsk_x';
+      process.env.GEMINI_API_KEY = 'AIza-x';
+      fetchMock()
+        .mockResolvedValueOnce(errResponse(429, 'Rate limit reached', { 'retry-after': '20' })) // groq
+        .mockResolvedValueOnce(errResponse(503)).mockResolvedValueOnce(errResponse(503)).mockResolvedValueOnce(errResponse(503)) // 3 Gemini models
+        .mockResolvedValueOnce(geminiOk('{"first":true}')); // Gemini again, 2 s later
+      const first = chatJson({ system: 's', user: 'u' });
+      await jest.advanceTimersByTimeAsync(2_000);
+      await expect(first).resolves.toMatchObject({ provider: 'google', text: '{"first":true}' });
+      expect(fetchMock()).toHaveBeenCalledTimes(5);
+      expect(aiHealth().circuit).toBe('open');
+
+      // The next scan doesn't spend time on Groq while it is rate-limited.
+      fetchMock().mockClear().mockResolvedValueOnce(geminiOk('{"second":true}'));
+      await expect(chatJson({ system: 's', user: 'u' })).resolves.toMatchObject({ provider: 'google' });
+      expect(fetchMock()).toHaveBeenCalledTimes(1);
+      expect(fetchMock().mock.calls[0][0]).toContain('generativelanguage');
+
+      // Once the named wait is over, Groq is first in line again.
+      await jest.advanceTimersByTimeAsync(18_000);
+      expect(aiHealth().circuit).toBe('closed');
+      fetchMock().mockClear().mockResolvedValueOnce(okResponse('{"third":true}'));
+      await expect(chatJson({ system: 's', user: 'u' })).resolves.toMatchObject({ provider: 'groq' });
+    });
+
+    it('waits out a rate limit of a few seconds within the same request', async () => {
+      process.env.GROQ_API_KEY = 'gsk_x';
+      fetchMock()
+        .mockResolvedValueOnce(errResponse(429, 'Rate limit reached on tokens per minute. Please try again in 3.5s.'))
+        .mockResolvedValueOnce(okResponse('{"ok":true}'));
+      const pending = chatJson({ system: 's', user: 'u' });
+      await jest.advanceTimersByTimeAsync(3_499);
+      expect(fetchMock()).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toMatchObject({ provider: 'groq' });
+    });
+
+    it('does not wait for a long rate limit, and never retries a hard failure', async () => {
+      process.env.OPENAI_API_KEY = 'sk-x';
+      process.env.GEMINI_API_KEY = 'AIza-x';
+      fetchMock()
+        .mockResolvedValueOnce(errResponse(429, 'quota', { 'retry-after': '120' }))
+        .mockResolvedValueOnce(errResponse(400, 'API key not valid'));
+      const err = await chatJson({ system: 's', user: 'u' }).catch(e => e); // settles with no timers advanced
+      expect(err).toBeInstanceOf(AIUnavailableError);
+      expect(err.attempts).toHaveLength(2);
+      expect(fetchMock()).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips the extra pass when the request has too little time left', async () => {
+      process.env.OPENAI_API_KEY = 'sk-x';
+      fetchMock().mockResolvedValue(errResponse(503));
+      const err = await chatJson({ system: 's', user: 'u', deadlineMs: 10_000 }).catch(e => e);
+      expect(err).toBeInstanceOf(AIUnavailableError);
+      expect(fetchMock()).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a busy saved key (BYOK) too, without a shared breaker', async () => {
+      fetchMock().mockResolvedValueOnce(errResponse(529, 'overloaded')).mockResolvedValueOnce({ ok: true, json: async () => ({ content: [{ text: '{"ok":1}' }] }) });
+      const pending = chatJson({ system: 's', user: 'u', customApiKey: 'sk-ant-user' });
+      await jest.advanceTimersByTimeAsync(2_000);
+      await expect(pending).resolves.toMatchObject({ provider: 'anthropic', source: 'saved key' });
+    });
+  });
+
+  it('parseRetryAfter reads the header, then the wait named in the body', () => {
+    const now = Date.parse('2026-10-22T10:00:00Z');
+    expect(parseRetryAfter('7', '')).toBe(7_000);
+    expect(parseRetryAfter('Thu, 22 Oct 2026 10:00:30 GMT', '', now)).toBe(30_000);
+    expect(parseRetryAfter(null, 'Limit 1000, Used 990. Please try again in 1m2.5s. Need more tokens?')).toBe(62_500);
+    expect(parseRetryAfter(undefined, 'Please try again in 850ms.')).toBe(850);
+    expect(parseRetryAfter('soon', '{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "37s"}')).toBe(37_000);
+    expect(parseRetryAfter(null, 'The model is overloaded.')).toBeUndefined();
   });
 
   it('isQuotaLike', () => {

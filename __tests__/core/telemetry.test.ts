@@ -30,10 +30,10 @@ describe('core/telemetry', () => {
     expect(out?.props).toEqual({ message: 'Error for [email]', path: '/scan/ngo-receipt/[number]' });
   });
 
-  it('logs one JSON line per event with the caller kind only', () => {
+  it('logs one JSON line per event, with no caller identity', () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
-    logEvents([{ event: 'scan_opened', props: { profile: 'ngo-receipt' } }, { event: 'retry', props: {} }], 'guest', new Date('2026-01-01T00:00:00Z'));
+    logEvents([{ event: 'scan_opened', props: { profile: 'ngo-receipt' } }, { event: 'retry', props: {} }], new Date('2026-01-01T00:00:00Z'));
     expect(info).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(info.mock.calls[0][0] as string)).toEqual({ type: 'telemetry', at: '2026-01-01T00:00:00.000Z', caller: 'guest', event: 'scan_opened', profile: 'ngo-receipt' });
+    expect(JSON.parse(info.mock.calls[0][0] as string)).toEqual({ type: 'telemetry', at: '2026-01-01T00:00:00.000Z', event: 'scan_opened', profile: 'ngo-receipt' });
   });
 });

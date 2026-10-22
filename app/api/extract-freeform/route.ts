@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorText, parseJson, resolveCaller, unauthorized } from '@/core/http';
-import { checkDemoDailyBudget } from '@/core/rate-limit';
 import { ExtractionUnavailableError, extractFields, MAX_DOCUMENT_BYTES, MAX_PAGES } from '@/modules/extraction';
 import { getProfile } from '@/modules/profiles';
 import { loadSettings } from '@/modules/settings';
@@ -8,7 +7,7 @@ import { loadSettings } from '@/modules/settings';
 export const maxDuration = 60;
 
 /** Machine-readable error codes so the UI can explain what to do next. */
-type ErrorCode = 'bad_input' | 'too_large' | 'demo_budget' | 'quota' | 'unavailable' | 'internal';
+type ErrorCode = 'bad_input' | 'too_large' | 'quota' | 'unavailable' | 'internal';
 
 const fail = (code: ErrorCode, error: string, status: number) => NextResponse.json({ error, code }, { status });
 
@@ -30,10 +29,6 @@ export async function POST(req: NextRequest) {
 
     const { openaiKey } = await loadSettings(req);
     const customApiKey = req.headers.get('x-openai-key') || openaiKey;
-    if (caller.isGuest && !customApiKey && !(await checkDemoDailyBudget())) {
-      return fail('demo_budget', 'The demo has reached its daily limit. Please try again tomorrow, or sign in with Google.', 429);
-    }
-
     const result = await extractFields({
       documents: await Promise.all(files.map(async f => Buffer.from(await f.arrayBuffer()))),
       profile,
@@ -41,9 +36,7 @@ export async function POST(req: NextRequest) {
       customApiKey,
     });
 
-    const response = NextResponse.json({ success: true, pages: files.length, ...result });
-    if (result.quotaFallback) response.headers.set('x-docsync-ai-fallback', 'quota');
-    return response;
+    return NextResponse.json({ success: true, pages: files.length, ...result });
   } catch (error) {
     if (error instanceof ExtractionUnavailableError) {
       if (error.kind === 'input') return fail('bad_input', error.message, 400);

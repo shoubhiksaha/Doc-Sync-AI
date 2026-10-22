@@ -5,7 +5,7 @@
  * cleaned up or dropped field-by-field.
  */
 import sharp from 'sharp';
-import { env, isModuleEnabled } from '@/core/env';
+import { isModuleEnabled } from '@/core/env';
 import { AIUnavailableError, aiCandidates, chatJson } from '@/modules/ai';
 import { validateFields, type DocumentProfile, type RecordField } from '@/modules/profiles';
 
@@ -21,8 +21,6 @@ export interface ExtractionResult {
   totalFieldsVisible: number;
   warnings: string[];
   isMock: boolean;
-  /** Set when mock data was returned because every provider was out of quota. */
-  quotaFallback?: boolean;
   provider?: string;
   stats: { originalSize: number; processedSize: number };
 }
@@ -113,7 +111,7 @@ For confidence: 95+ = clearly printed, 75-94 = slightly unclear, 50-74 = partial
 Return every field you can possibly identify.${profile ? `\n\nContext: ${profile.extraction.context}` : ''}${priority.length ? `\n\nALWAYS look for these fields and use these labels when present: ${priority.join(', ')}.` : ''}`;
 }
 
-function mockResult(profile: DocumentProfile | undefined, stats: ExtractionResult['stats'], quotaFallback = false): ExtractionResult {
+function mockResult(profile: DocumentProfile | undefined, stats: ExtractionResult['stats']): ExtractionResult {
   const fields = normalizeFields(profile?.mockFields ?? []);
   return {
     documentType: 'Mock Document',
@@ -121,7 +119,6 @@ function mockResult(profile: DocumentProfile | undefined, stats: ExtractionResul
     totalFieldsVisible: fields.length,
     warnings: profile ? validateFields(profile, fields) : [],
     isMock: true,
-    ...(quotaFallback ? { quotaFallback } : {}),
     stats,
   };
 }
@@ -172,7 +169,7 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
     }
     const fields = normalizeFields(parsed.fields);
     if (fields.length === 0) {
-      throw new ExtractionUnavailableError('No details could be read from this document. Try a clearer, well-lit photo.', false);
+      throw new ExtractionUnavailableError('No details could be read from this document. Try a clearer, well-lit photo.', false, 'input');
     }
 
     return {
@@ -186,9 +183,6 @@ export async function extractFields(input: ExtractInput): Promise<ExtractionResu
     };
   } catch (err) {
     if (err instanceof AIUnavailableError) {
-      if (err.quotaLike && env('DEMO_FALLBACK_ON_AI_QUOTA') === 'true') {
-        return mockResult(input.profile, stats, true);
-      }
       // Provider details go to the server log; the user gets a plain explanation.
       console.error('[extraction] every AI provider failed:', err.message.slice(0, 1000));
       throw new ExtractionUnavailableError(

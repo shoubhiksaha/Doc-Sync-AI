@@ -58,7 +58,7 @@ export default function RecentScans({ profileNames }: { profileNames: Record<str
     try {
       const outcome = await syncRecord({ profileId: scan.profileId, fields: scan.fields, archive: scan.archive ?? null, note: scan.note ?? '', audio: scan.audio ?? null, only, duplicateAction: 'keep_both' });
       if (outcome.kind === 'saved') {
-        const previous: SaveResult = { status: scan.status === 'saved' ? 'saved' : scan.status === 'partial' ? 'partial' : 'failed', mock: false, destinations: scan.destinations ?? {}, warnings: [] };
+        const previous: SaveResult = { status: scan.status === 'saved' ? 'saved' : scan.status === 'partial' ? 'partial' : 'failed', destinations: scan.destinations ?? {}, warnings: [] };
         const merged = mergeRetry(previous, outcome.result);
         await putScan({ ...scan, status: merged.status, destinations: merged.destinations, spreadsheetUrl: merged.spreadsheetUrl ?? scan.spreadsheetUrl, updatedAt: Date.now() });
         toast(t('recent.retried'));

@@ -3,7 +3,7 @@ import { resetBreakers } from '@/core/isolation';
 import { buildSystemPrompt, extractFields, ExtractionUnavailableError, normalizeFields } from '@/modules/extraction';
 import { getProfile } from '@/modules/profiles';
 
-const KEYS = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'MODULE_EXTRACTION', 'DEMO_FALLBACK_ON_AI_QUOTA'];
+const KEYS = ['GROQ_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'MODULE_EXTRACTION'];
 
 let image: Buffer;
 beforeAll(async () => {
@@ -65,19 +65,21 @@ describe('modules/extraction', () => {
     await expect(extractFields({ document: image, profile: ngo })).rejects.toThrow(ExtractionUnavailableError);
   });
 
-  it('maps all-providers-out-of-quota to a quota error, or to mock data when the demo fallback is on', async () => {
+  it('treats a photo with nothing readable as an input problem, not a service outage', async () => {
     process.env.OPENAI_API_KEY = 'sk-x';
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429, text: async () => 'quota' });
+    (global.fetch as jest.Mock).mockResolvedValue(modelReply({ fields: [] }));
+    await expect(extractFields({ document: image, profile: ngo })).rejects.toMatchObject({ kind: 'input', message: expect.stringMatching(/clearer/) });
+  });
+
+  it('maps all-providers-out-of-quota to a quota error, never to sample data', async () => {
+    process.env.OPENAI_API_KEY = 'sk-x';
+    // A daily quota names a long wait, so the request fails at once instead of retrying.
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429, text: async () => 'quota', headers: new Headers({ 'retry-after': '3600' }) });
     const err = await extractFields({ document: image, profile: ngo }).catch(e => e);
     expect(err).toBeInstanceOf(ExtractionUnavailableError);
     expect(err.quotaLike).toBe(true);
     expect(err.message).toMatch(/busy|limit/);
     expect(err.message).not.toMatch(/429|quota/);
-
-    process.env.DEMO_FALLBACK_ON_AI_QUOTA = 'true';
-    resetBreakers();
-    const res = await extractFields({ document: image, profile: ngo });
-    expect(res).toMatchObject({ isMock: true, quotaFallback: true });
   });
 
   it('sends every page of a multi-page document in one request', async () => {

@@ -10,7 +10,7 @@ const source = path.join(root, 'public', 'icon.svg');
 const outDir = path.join(root, 'public', 'icons');
 
 // Background of icon.svg's rounded square, used wherever the icon needs a solid fill.
-const BACKGROUND = '#0f172a';
+const BACKGROUND = '#0a0a0a';
 
 const svg = await readFile(source);
 await mkdir(outDir, { recursive: true });

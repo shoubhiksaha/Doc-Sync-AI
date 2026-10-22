@@ -1,7 +1,6 @@
 'use client';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 import { useI18n } from '@/client/i18n/I18nProvider';
@@ -61,8 +60,6 @@ function writeStorage(key: string, value: string | null) {
 
 export default function ScanClient({ profileId, documentName, sampleHref, resumeId }: ScanClientProps) {
   const { t } = useI18n();
-  const { status: sessionStatus } = useSession();
-  const isGuest = sessionStatus === 'unauthenticated';
 
   const [state, dispatch] = useReducer(scanReducer, initialScanState);
   const [prefs, setPrefs] = useState<ProfilePrefs | null>(null);
@@ -249,7 +246,7 @@ export default function ScanClient({ profileId, documentName, sampleHref, resume
         added: current.fields.filter(f => f.origin === 'user').length,
       });
       track('sync_finished', {
-        profile: profileId, ms: Math.round(performance.now() - started), status: result.status, mock: result.mock,
+        profile: profileId, ms: Math.round(performance.now() - started), status: result.status,
         sheets: result.destinations.sheets?.code, notion: result.destinations.notion?.code, media: result.destinations.media?.code,
       });
       await store(result, fields, image);
@@ -395,7 +392,6 @@ export default function ScanClient({ profileId, documentName, sampleHref, resume
             if (action.type === 'auto-save-cancel') track('auto_save_cancelled', { profile: profileId });
             dispatch(action);
           }}
-          isGuest={isGuest}
           saving={state.step === 'saving'}
           countdown={countdown}
           duplicateKey={duplicateKey}
@@ -410,7 +406,6 @@ export default function ScanClient({ profileId, documentName, sampleHref, resume
           result={state.result}
           fields={syncedFields}
           documentName={documentName}
-          isGuest={isGuest}
           retrying={retrying}
           offerRemember={offerRemember}
           offerNotion={!notionDismissed && state.result.destinations.notion?.code === 'not_connected'}
@@ -435,7 +430,6 @@ export default function ScanClient({ profileId, documentName, sampleHref, resume
 
       <DuplicateDialog
         info={state.duplicate}
-        allowReplace={!isGuest}
         onCancel={() => {
           dispatch({ type: 'duplicate-close' });
           toast(t('dup.cancelled'));

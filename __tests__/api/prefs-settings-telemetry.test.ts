@@ -1,13 +1,16 @@
 const getToken = jest.fn();
 jest.mock('next-auth/jwt', () => ({ getToken: (...a: unknown[]) => getToken(...a) }));
-jest.mock('@/modules/settings/firestore', () => ({ getDb: () => null, firestoreConfigured: () => false }));
+jest.mock('@/modules/settings/firestore', () => ({
+  firestoreForRequest: () => null,
+  firestoreState: async () => 'not_configured',
+  reportFirestore: () => undefined,
+}));
 
 import { NextRequest } from 'next/server';
 import { GET as getPrefs, POST as savePrefs } from '@/app/api/profile-prefs/route';
 import { GET as getSettings, POST as saveSettings } from '@/app/api/settings/route';
 import { POST as telemetry } from '@/app/api/telemetry/route';
 import { encrypt } from '@/core/crypto';
-import { createGuestToken } from '@/core/guest';
 
 const SECRET = 'route-secret';
 
@@ -25,7 +28,6 @@ describe('settings, profile-prefs and telemetry routes', () => {
   const saved = { ...process.env };
   beforeEach(() => {
     process.env = { ...saved, NEXTAUTH_SECRET: SECRET, ENCRYPTION_KEY: 'd'.repeat(64) };
-    delete process.env.MODULE_DEMO;
     getToken.mockReset().mockResolvedValue({ email: 'u@x', accessToken: 't' });
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -33,16 +35,16 @@ describe('settings, profile-prefs and telemetry routes', () => {
   afterAll(() => { process.env = saved; });
 
   describe('/api/settings', () => {
-    it('GET returns a masked key, its provider and whether the caller is a guest', async () => {
+    it('GET returns a masked key and its provider, and needs a signed-in caller', async () => {
       const res = await getSettings(req('/api/settings', { cookie: `docsync_openai=${encrypt('gsk_0123456789abcdefWXYZ')}` }));
       const body = await res.json();
-      expect(body).toMatchObject({ hasOpenAiKey: true, aiKeyHint: 'gsk_…WXYZ', aiProvider: 'groq', isGuest: false });
+      expect(body).toMatchObject({ hasOpenAiKey: true, aiKeyHint: 'gsk_…WXYZ', aiProvider: 'groq', isPersistent: false, syncAvailable: false });
+      expect(body).not.toHaveProperty('isGuest');
       expect(JSON.stringify(body)).not.toContain('0123456789');
 
       getToken.mockResolvedValue(null);
-      const guest = await getSettings(req('/api/settings', { cookie: `docsync_guest=${await createGuestToken(SECRET)}` }));
-      expect(await guest.json()).toMatchObject({ isGuest: true, aiKeyHint: null, aiProvider: null });
       expect((await getSettings(req('/api/settings'))).status).toBe(401);
+      expect((await getSettings(req('/api/settings', { cookie: 'docsync_guest=v1.9999999999.n.s' }))).status).toBe(401);
     });
 
     it('POST is a partial update: one field changes, persistence mode is left alone, "" removes a key', async () => {
@@ -118,7 +120,7 @@ describe('settings, profile-prefs and telemetry routes', () => {
       expect(res.status).toBe(204);
       expect(info).toHaveBeenCalledTimes(1);
       const line = JSON.parse(info.mock.calls[0][0] as string);
-      expect(line).toMatchObject({ type: 'telemetry', caller: 'user', event: 'scan_opened', profile: 'ngo-receipt' });
+      expect(line).toMatchObject({ type: 'telemetry', event: 'scan_opened', profile: 'ngo-receipt' });
       expect(line.email).toBeUndefined();
 
       info.mockClear();

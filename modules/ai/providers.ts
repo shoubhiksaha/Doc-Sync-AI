@@ -15,7 +15,7 @@ export function defaultModel(provider: ProviderId): string {
   switch (provider) {
     case 'openai': return env('OPENAI_VISION_MODEL') ?? 'gpt-4o';
     case 'anthropic': return env('ANTHROPIC_VISION_MODEL') ?? 'claude-sonnet-5-5';
-    case 'groq': return env('GROQ_VISION_MODEL') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
+    case 'groq': return env('GROQ_VISION_MODEL') ?? 'qwen/qwen3.8-27b';
     case 'google': return env('GEMINI_VISION_MODEL') ?? 'gemini-3.6-flash';
   }
 }

@@ -1,11 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { test, expect, type APIResponse } from '@playwright/test';
+import { signIn } from '../support/session';
+import { SAVED } from '../support/stubs';
 
 // Smoke suite for the quality gate: the built app runs locally with no AI or Google
-// credentials, so every module is in mock mode and nothing leaves the runner.
+// credentials, so every module is in mock mode and nothing leaves the runner. Signed-in tests
+// use a locally signed session (see ../support/session.ts); there is no demo mode.
 
-const MODULE_KEYS = ['ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings', 'demo'];
+const MODULE_KEYS = ['ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings'];
 const SAMPLE_RECEIPT = path.join(__dirname, '..', '..', 'public', 'sample-ngo-receipt.png');
 
 async function expectRedirectToLogin(response: APIResponse) {
@@ -40,13 +43,23 @@ test.describe('Smoke (local, mock mode)', () => {
     expect(await settings.json()).toHaveProperty('error');
   });
 
-  test('3. Demo mode login lands on the home page with active profiles', async ({ page }) => {
+  test('3. Login offers Google sign-in only; demo sign-in is gone', async ({ page }) => {
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /demo/i })).toHaveCount(0);
+
+    const guest = await page.request.post('/api/auth/guest', { maxRedirects: 0 });
+    expect(guest.ok()).toBe(false);
+    expect(guest.headers()['set-cookie'] || '').not.toContain('docsync_guest');
+  });
+
+  test('4. Signed-in users land on the home page with active profiles', async ({ page, baseURL }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
-    await page.goto('/login');
-    await page.getByRole('button', { name: /Try the demo/ }).click();
-    await page.waitForURL((url) => url.pathname === '/', { timeout: 15000 });
+    await signIn(page.context(), baseURL!);
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     const ngo = page.locator('a[href="/scan/ngo-receipt"]');
     await expect(ngo).toBeVisible();
@@ -59,9 +72,8 @@ test.describe('Smoke (local, mock mode)', () => {
     expect(errors).toHaveLength(0);
   });
 
-  test('4. Guest extraction returns mock fields when no AI key is configured', async ({ page }) => {
-    const guest = await page.request.post('/api/auth/guest');
-    expect(guest.ok()).toBe(true);
+  test('5. Extraction returns mock fields when no AI key is configured', async ({ page, baseURL }) => {
+    await signIn(page.context(), baseURL!);
 
     const response = await page.request.post('/api/extract-freeform', {
       multipart: {
@@ -80,5 +92,38 @@ test.describe('Smoke (local, mock mode)', () => {
     expect(body.isMock).toBe(true);
     expect(Array.isArray(body.fields)).toBe(true);
     expect(body.fields.length).toBeGreaterThan(0);
+  });
+
+  test('6. Every app reads a document and saves it, with the ADT badge on every screen', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    const adt = () => page.getByRole('link', { name: /An offering by ADT/ });
+
+    await page.goto('/login');
+    await expect(adt()).toHaveAttribute('href', 'https://analogdigital.tech');
+    await signIn(page.context(), baseURL!);
+    // The save is answered by a stub, so the run never touches a Google account.
+    await page.route('**/api/sync', (route) => route.fulfill({ json: SAVED }));
+    for (const screen of ['/', '/settings']) {
+      await page.goto(screen);
+      await expect(adt(), screen).toBeVisible();
+    }
+
+    for (const app of ['ngo-receipt', 'factory-weight-slip']) {
+      await page.goto(`/scan/${app}`);
+      await expect(adt(), app).toBeVisible();
+      const chooser = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Upload photo or PDF' }).click();
+      await (await chooser).setFiles(SAMPLE_RECEIPT);
+      await expect(page.getByRole('heading', { name: 'Check the details' })).toBeVisible({ timeout: 60_000 });
+      await page.getByRole('button', { name: 'Save to Google Sheet' }).click();
+      await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible({ timeout: 30_000 });
+      await expect(adt(), app).toBeVisible();
+    }
+
+    const badgeLoaded = await adt().locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0);
+    expect(badgeLoaded).toBe(true);
+    expect(errors).toEqual([]);
   });
 });

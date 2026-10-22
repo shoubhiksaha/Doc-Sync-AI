@@ -28,7 +28,7 @@ describe('UniversalAIAdapter', () => {
     expect(googleAdapter.modelName).toBe('gemini-3.6-flash');
 
     const groqAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'groq' });
-    expect(groqAdapter.modelName).toBe('meta-llama/llama-4-scout-17b-16e-instruct');
+    expect(groqAdapter.modelName).toBe('qwen/qwen3.8-27b');
 
     const anthropicAdapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'anthropic' });
     expect(anthropicAdapter.modelName).toBe('claude-sonnet-5-5');
@@ -166,6 +166,27 @@ describe('UniversalAIAdapter', () => {
 
       const adapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
       await expect(adapter.chat('sys', 'user')).rejects.toThrow('Google API Error: 500 - err3');
+    });
+
+    it('reports every model busy as busy, naming a wait only when every model named one', async () => {
+      const limited = (s: number) => ({ ok: false, status: 429, text: async () => `{"retryDelay": "${s}s"}`, headers: new Headers() });
+      const adapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(limited(30)).mockResolvedValueOnce(limited(10)).mockResolvedValueOnce(limited(20));
+      await expect(adapter.chat('sys', 'user')).rejects.toMatchObject({ name: 'ProviderHttpError', status: 429, transient: true, retryAfterMs: 10_000 });
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce(limited(30)).mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' }).mockResolvedValueOnce(limited(20));
+      await expect(adapter.chat('sys', 'user')).rejects.toMatchObject({ transient: true, retryAfterMs: undefined });
+
+      // Overloaded, then a retired fallback model: still busy, because the first model was.
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' }).mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' }).mockResolvedValueOnce({ ok: false, status: 404, text: async () => '' });
+      await expect(adapter.chat('sys', 'user')).rejects.toMatchObject({ status: 404, transient: true });
+    });
+
+    it('treats a rejected request (400) as a hard failure', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 400, text: async () => 'API key not valid' });
+      const adapter = new UniversalAIAdapter({ apiKey: 'fake', provider: 'google' });
+      await expect(adapter.chat('sys', 'user')).rejects.toMatchObject({ status: 400, transient: false });
     });
 
     it('falls back to empty string if error text fails', async () => {

@@ -13,10 +13,9 @@ core/                 Shared kernel. Small, stable, no feature logic. Never impo
   isolation.ts        runIsolated(): timeout + kill switch + circuit breaker, never throws
   crypto.ts           Cookie encryption (lazy key: a missing key can't crash unrelated routes)
   envelope.ts         Envelope encryption for keys stored in Firestore
-  guest.ts            Signed demo sessions (Web Crypto; runs in middleware and routes)
-  rate-limit.ts       Per-route-group limits + demo daily AI budget
+  rate-limit.ts       Per-route-group limits for signed-in clients
   telemetry.ts        Allow-listed, scrubbed product events → one JSON log line each
-  google-auth.ts      Google OAuth / service-account clients, Drive folder helper
+  google-auth.ts      Google OAuth client for the signed-in user, Drive folder helper
   http.ts, text.ts    Request helpers, string/number helpers
 
 modules/              Feature modules. Each has ONE public entry: modules/<name>/index.ts
@@ -27,7 +26,7 @@ modules/              Feature modules. Each has ONE public entry: modules/<name>
   transcription/      Voice note → text
   sheets/             Google Sheets (headers, rows, duplicates)
   notion/             Notion pages + OAuth database creation
-  media/              Image/audio archive (user's Drive; demo: nothing unless opted in)
+  media/              Image/audio archive in the user's own Drive
   settings/           BYOK keys + destinations + per-profile prefs (cookies, optional Firestore)
   sync/               Orchestrator: sends one document to Sheets, Notion and media
 
@@ -43,7 +42,7 @@ app/                  Next.js routes and UI. Routes are thin: parse → call a m
   components/ui/      Design-system kit: Button, Dialog (native <dialog>), Badge, Notice, Card,
                       Stepper, fields. Colours/spacing only from tokens in app/globals.css
   scan/[profile]/     ScanClient (orchestrator) + one component per step
-middleware.ts         Auth gate (verified session or signed guest), rate limits on every API route
+middleware.ts         Auth gate (Google session required), rate limits on every API route
 ```
 
 ### Rules (enforced by ESLint `no-restricted-imports`)
@@ -64,8 +63,8 @@ middleware.ts         Auth gate (verified session or signed guest), rate limits 
 | Providers | The ai module tries the next provider after any error; failing server keys are paused for 60s | A retired Groq model or an exhausted OpenAI quota falls through to Gemini |
 | Profiles | `deriveFields()` / `validateFields()` catch profile bugs | A broken weight-slip validator shows a warning; NGO receipts are untouched |
 | UI | Route `error.tsx` boundaries + `<ModuleBoundary>` around panels | The voice-note panel crashing hides only that panel |
-| Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings, demo) | During a Notion incident, set `MODULE_NOTION=off` in Vercel and redeploy the same build — no code change |
-| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state | Post-deploy contract tests and uptime checks read it |
+| Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings) | During a Notion incident, set `MODULE_NOTION=off` in Vercel and redeploy the same build — no code change |
+| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state; `settings.persistence` is `ok`, `unreachable` (credentials set but Firestore doesn't answer, e.g. API disabled or database missing; reported as `degraded`) or `not_configured`. Firestore is probed with one small read at most once a minute, and a failing Firestore is skipped and logged once a minute, not on every request. No internal error text is ever in the response | Post-deploy contract tests and uptime checks read it |
 
 ### The sync flow
 
@@ -87,9 +86,9 @@ behind without its Sheets row.
 
 Every destination in the response carries a machine-readable `code` so the UI can explain it
 without parsing text: `saved`, `failed`, or for a skip `not_connected`, `not_selected`,
-`nothing_to_store`, `not_retried`, `disabled` (kill switch), `paused` (circuit breaker open),
-`duplicate`, or `skipped`. The response also returns `spreadsheetId`, `spreadsheetUrl` and `mock`
-(true when a demo row was not written to a real sheet).
+`nothing_to_store`, `not_stored` (Google session expired, so the photo wasn't kept), `not_retried`,
+`disabled` (kill switch), `paused` (circuit breaker open), `duplicate`, or `skipped`. The response
+also returns `spreadsheetId` and `spreadsheetUrl`.
 
 **Retrying one destination.** `only=notion,media` (form field) runs just those destinations; the
 rest are skipped as `not_retried`, and the duplicate check runs only when `sheets` is included. A
@@ -104,8 +103,8 @@ saved preference, else the profile's `duplicateKey` (`''` saved by the user turn
 
 | Route | Contract |
 |---|---|
-| `POST /api/extract-freeform` | 1–4 `document` entries = pages of one document (images; the client renders PDFs). All pages go to the model in one request. Errors return `{ error, code }` with `code` ∈ `bad_input`, `too_large`, `demo_budget`, `quota`, `unavailable`, `internal`; messages are plain language, provider details stay in server logs. |
-| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent`, `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`, `isGuest`. Saved keys never leave the server. |
+| `POST /api/extract-freeform` | 1–4 `document` entries = pages of one document (images; the client renders PDFs). All pages go to the model in one request. Errors return `{ error, code }` with `code` ∈ `bad_input`, `too_large`, `quota`, `unavailable`, `internal`; messages are plain language, provider details stay in server logs. |
+| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent` (chosen *and* Firestore is answering), `syncAvailable` (Firestore is answering; the Settings page disables the choice otherwise), `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`. Saved keys never leave the server. |
 | `POST /api/settings` | Partial update: only fields present change; `''` removes a value. Persistent mode changes only when `persistent` is sent. |
 | `GET/POST /api/profile-prefs` | Per-profile `fields` (remembered field list, `null` = review every scan) and `primaryKey` (`null` = profile default, `''` = no duplicate check), plus `defaultPrimaryKey`. Stored in the encrypted `docsync_prefs` cookie and, in persistent mode, in Firestore `users/{email}.profilePrefs`. |
 | `POST /api/telemetry` | `{ event, props }` or `{ events: [...] }` (≤ 20). Unknown events/props are dropped, strings capped, emails and 6+ digit runs scrubbed; each event becomes one `{"type":"telemetry",…}` log line with the caller kind only. Own rate-limit group. Returns 204. |
@@ -125,8 +124,7 @@ The UI follows the same idea: small parts with clear contracts.
 - **Dialogs** use the native `<dialog>` element (top layer, focus trap, Esc). Nothing uses a CSS
   transform on a page wrapper, because that traps `position: fixed` children.
 - **Honest results:** the done screen shows each destination's `code` from `/api/sync` (saved,
-  not connected, not stored in demo, paused, failed + retry). Demo saves without a demo sheet say
-  "nothing was saved".
+  not connected, not stored, paused, failed + retry).
 - **Offline:** photos added offline are kept in IndexedDB and listed under Recent scans on the home
   page, ready to process once back online. `public/sw.js` serves cached pages when offline
   (network-first; content-hashed assets cache-first). Sign-out clears caches, IndexedDB and
@@ -136,6 +134,13 @@ The UI follows the same idea: small parts with clear contracts.
   layout checks on desktop and phone viewports in CI.
 - **Language:** English and Hindi (`docsync_lang` cookie, toggle in the navbar). `hi.ts` is typed
   against `en.ts`, and a unit test checks every placeholder matches.
+- **Brand:** DocSync AI is an offering by ADT (Analog Digital Technologies). The tokens use ADT's
+  palette (Signal Aqua `#01F9C9`, Deep Black `#0A0A0A`) and type (Space Grotesk headings, IBM Plex
+  Sans text). On light surfaces aqua is only a fill under black text; aqua text, thin borders and
+  focus rings use `--accent-text` (`#00735C`). "An offering by ADT" (`app/components/AdtEndorsement.tsx`)
+  is stacked under the sign-in card and one line at the bottom of every other page and
+  `offline.html`, and links to analogdigital.tech. The SVGs in `public/brand/` come unchanged from
+  ADT's brand kit (`ADT Papers/brand/logo/final/endorsement`); replace them from there, never edit them.
 
 ## Changing things independently
 
@@ -146,7 +151,8 @@ The UI follows the same idea: small parts with clear contracts.
   `GEMINI_VISION_MODEL`, `GROQ_VISION_MODEL`, `ANTHROPIC_VISION_MODEL` per environment.
 - **Change how Sheets lays out rows:** `modules/sheets/a1.ts` (pure functions, fully unit-tested).
 - **Change copy or add a language:** `client/i18n/` (add a dictionary typed `Record<MessageKey, string>`).
-- **Change the look:** tokens in `app/globals.css`, components in `app/components/ui/`.
+- **Change the look:** tokens in `app/globals.css` (ADT's palette; see Brand above), components in
+  `app/components/ui/`.
 - **Add a destination:** create `modules/<name>/` with an `index.ts` and a `<name>Health()`, add it
   to the orchestrator in `modules/sync` behind `runIsolated()`, and to `/api/health`.
 
@@ -156,5 +162,7 @@ The UI follows the same idea: small parts with clear contracts.
 or being switched off while the others still complete. `__tests__/core/isolation.test.ts` covers
 timeouts and circuit breakers. `__tests__/client/` covers the scan state machine, the API client and
 the translations. Coverage thresholds apply to `core/`, `modules/`, `middleware.ts` and the pure
-`client/` files. Playwright: `smoke.spec.ts` (API + demo login) and `ux.spec.ts` (accessibility and
-layout on desktop + phone) run in CI against the production build in mock mode.
+`client/` files. Playwright: `smoke.spec.ts` (API + sign-in gate) and `ux.spec.ts` (accessibility and
+layout on desktop + phone) run in CI against the production build in mock mode. They sign in with a
+session cookie signed by the test server's own `NEXTAUTH_SECRET` (`e2e/support/session.ts`), so
+no login route exists only for tests.

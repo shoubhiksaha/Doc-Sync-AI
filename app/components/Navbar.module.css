@@ -20,6 +20,7 @@
   gap: 10px;
   min-height: 44px;
   color: var(--text);
+  font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 700;
   text-decoration: none;
@@ -64,21 +65,6 @@
 
 .navButton:disabled {
   opacity: 0.6;
-}
-
-.demoChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  margin-right: 4px;
-  padding: 4px 12px;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-full);
-  background: var(--warning-soft);
-  color: var(--warning);
-  font-size: 0.85rem;
-  font-weight: 700;
 }
 
 .avatar {

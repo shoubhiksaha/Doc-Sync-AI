@@ -36,11 +36,12 @@ or schema-suggestion endpoint.
 ## User interface
 The scan flow (`client/scan-flow.ts`, `app/scan/[profile]/`) is a small state machine: photo →
 reading → check → saved. Remembered fields and the duplicate-check field are per-profile
-preferences (`/api/profile-prefs`). Copy lives in `client/i18n/` (English and Hindi). See the UI
-section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
+preferences (`/api/profile-prefs`). Copy lives in `client/i18n/` (English and Hindi). DocSync AI is
+an offering by ADT: it uses ADT's colours and type, and every screen carries the "An offering by ADT"
+badge. See the UI section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui).
 
 ## Resilience & Persistence
 The agents are stateless. Signed-in users' keys come from encrypted cookies or (optionally)
-Firestore with envelope encryption. Demo users get a signed, rate-limited guest session that uses
-server keys within a daily budget and writes only to the shared demo sheet. Any module can be
+Firestore with envelope encryption. Everyone signs in with Google; there is no demo or guest mode,
+and each user's rows go only to their own sheet. Any module can be
 switched off with `MODULE_<NAME>=off`, and `/api/health` reports each module's state.

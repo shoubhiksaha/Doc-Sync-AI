@@ -35,7 +35,7 @@
 }
 
 .dropzoneActive {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   background: var(--accent-soft);
 }
 
@@ -210,7 +210,7 @@
 }
 
 .pageButton[aria-pressed='true'] {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .viewer {
@@ -295,6 +295,14 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.fieldValue {
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 

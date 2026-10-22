@@ -17,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-const CODES: ErrorCode[] = ['bad_input', 'too_large', 'demo_budget', 'quota', 'unavailable', 'rate_limited', 'network', 'session', 'internal'];
+const CODES: ErrorCode[] = ['bad_input', 'too_large', 'quota', 'unavailable', 'rate_limited', 'network', 'session', 'internal'];
 
 export function errorCodeFor(status: number, body: unknown): ErrorCode {
   const code = (body as { code?: unknown } | null)?.code;
@@ -62,7 +62,6 @@ export async function extractDocument(pages: Blob[], profileId: string, focusFie
     fields: body.fields,
     documentType: body.documentType,
     isMock: Boolean(body.isMock),
-    quotaFallback: Boolean(body.quotaFallback),
     warnings: Array.isArray(body.warnings) ? body.warnings : [],
   };
 }
@@ -155,8 +154,10 @@ export interface SettingsStatus {
   hasNotionKey: boolean;
   hasNotionDbId: boolean;
   uploadDest: UploadDest;
+  /** Cross-device settings are on and actually being kept. */
   isPersistent: boolean;
-  isGuest: boolean;
+  /** Cross-device settings work right now; when false the choice is shown but can't be changed. */
+  syncAvailable: boolean;
 }
 
 export async function fetchSettings(): Promise<SettingsStatus> {

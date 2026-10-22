@@ -53,6 +53,22 @@ export function recordFailure(key: string, now = Date.now()): void {
   breakers.set(key, state);
 }
 
+/** When an open circuit closes again (0 when it is closed). */
+export function pausedUntil(key: string, now = Date.now()): number {
+  const until = breakers.get(key)?.openUntil ?? 0;
+  return until > now ? until : 0;
+}
+
+/**
+ * Pauses a key until `until` without counting a failure: for a dependency that said it is
+ * rate-limited and named a time (Retry-After), so it is skipped exactly that long, not a minute.
+ */
+export function pauseCircuit(key: string, until: number): void {
+  const state = breakers.get(key) ?? { failures: 0, openUntil: 0 };
+  state.openUntil = Math.max(state.openUntil, until);
+  breakers.set(key, state);
+}
+
 /** Test helper. */
 export function resetBreakers(): void {
   breakers.clear();

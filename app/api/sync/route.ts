@@ -42,7 +42,7 @@ function describe(report: SyncReport) {
       const outcome = report.destinations[name];
       if (outcome.status === 'failed') return [name, { status: 'failed', code: 'failed' as DestinationCode, detail: outcome.error }];
       if (outcome.status === 'skipped') return [name, { status: 'skipped', code: (outcome.code ?? 'skipped') as DestinationCode, detail: outcome.reason }];
-      // Media "succeeds" without uploading anything in demo mode (photos aren't stored there).
+      // Media "succeeds" without uploading anything when the Google session has expired.
       const media = report.destinations.media;
       if (name === 'media' && media.status === 'ok' && !media.value.imageUrl && !media.value.audioUrl) {
         return [name, { status: 'skipped', code: 'not_stored' as DestinationCode }];
@@ -71,15 +71,10 @@ export async function POST(req: NextRequest) {
 
     const rawAction = formData.get('duplicateAction');
     const duplicateAction = rawAction === 'replace' || rawAction === 'keep_both' ? rawAction : null;
-    if (duplicateAction === 'replace' && caller.isGuest) {
-      return NextResponse.json({ error: 'Replacing rows is not available in demo mode. Choose "Keep Both" or sign in.' }, { status: 403 });
-    }
 
     const [settings, prefs] = await Promise.all([loadSettings(req), loadProfilePrefs(req, profile.id)]);
     const formSheetId = formData.get('spreadsheetId');
-    const spreadsheetId = caller.isGuest
-      ? null
-      : (typeof formSheetId === 'string' && formSheetId.trim()) || req.cookies.get(sheetCookie(profile.id))?.value || null;
+    const spreadsheetId = (typeof formSheetId === 'string' && formSheetId.trim()) || req.cookies.get(sheetCookie(profile.id))?.value || null;
 
     const report = await syncDocument({
       profile,
@@ -118,9 +113,7 @@ export async function POST(req: NextRequest) {
       return `${LABELS[d]} sync failed${outcome.status === 'failed' ? `: ${outcome.error}` : ''}`;
     });
 
-    let message = failed.length === 0 ? 'Successfully synced to all destinations' : `Synced to ${succeeded.map(d => LABELS[d]).join(', ') || 'no destination'}; ${failed.map(d => LABELS[d]).join(', ')} failed.`;
-    if (caller.isGuest && sheets?.spreadsheetId) message += ' Demo mode writes to a shared demo sheet — sign in to use your own private sheet.';
-    if (sheets?.mock) message += ' (Demo mode — not saved to a real sheet.)';
+    const message = failed.length === 0 ? 'Successfully synced to all destinations' : `Synced to ${succeeded.map(d => LABELS[d]).join(', ') || 'no destination'}; ${failed.map(d => LABELS[d]).join(', ')} failed.`;
 
     const response = NextResponse.json({
       success: failed.length === 0,
@@ -132,11 +125,10 @@ export async function POST(req: NextRequest) {
       imageUrl: report.imageLink,
       spreadsheetId: sheets?.spreadsheetId ?? null,
       spreadsheetUrl: sheets?.spreadsheetUrl,
-      mock: Boolean(sheets?.mock),
     }, { status: failed.length > 0 && succeeded.length === 0 ? 502 : 200 });
 
     // Remember the user's sheet for this profile so later syncs skip the Drive lookup.
-    if (!caller.isGuest && sheets?.spreadsheetId && !sheets.mock) {
+    if (sheets?.spreadsheetId) {
       response.cookies.set(sheetCookie(profile.id), sheets.spreadsheetId, {
         httpOnly: false,
         sameSite: 'lax',

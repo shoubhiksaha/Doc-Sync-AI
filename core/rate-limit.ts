@@ -7,29 +7,22 @@ import { Redis } from '@upstash/redis/cloudflare';
  * per instance (resets on cold starts — a best-effort fallback). Edge-runtime compatible.
  */
 
-export type RateGroup = 'ai' | 'write' | 'guest-issue' | 'telemetry' | 'default';
-export type Caller = 'guest' | 'user' | 'anonymous';
+export type RateGroup = 'ai' | 'write' | 'telemetry' | 'default';
 
 const WINDOW_MS = 10 * 60 * 1000;
 
-const LIMITS: Record<RateGroup, Record<Caller, number>> = {
-  ai:            { guest: 10, user: 30, anonymous: 0 },
-  write:         { guest: 15, user: 60, anonymous: 0 },
-  'guest-issue': { guest: 10, user: 10, anonymous: 10 },
-  telemetry:     { guest: 60, user: 120, anonymous: 0 },
-  default:       { guest: 120, user: 240, anonymous: 120 },
-};
+/** Requests per window for one signed-in client IP. Signed-out requests never reach a limited route. */
+const LIMITS: Record<RateGroup, number> = { ai: 30, write: 60, telemetry: 120, default: 240 };
 
 export function rateGroupFor(pathname: string): RateGroup {
   if (pathname === '/api/extract-freeform' || pathname === '/api/transcribe') return 'ai';
   if (pathname === '/api/sync' || pathname === '/api/sheets/create') return 'write';
-  if (pathname === '/api/auth/guest') return 'guest-issue';
   if (pathname === '/api/telemetry') return 'telemetry';
   return 'default';
 }
 
-export function limitFor(group: RateGroup, caller: Caller): number {
-  return LIMITS[group][caller];
+export function limitFor(group: RateGroup): number {
+  return LIMITS[group];
 }
 
 export function clientIp(headers: Headers): string {
@@ -81,20 +74,8 @@ export async function consume(key: string, limit: number, windowMs = WINDOW_MS, 
   return true;
 }
 
-export async function checkRateLimit(headers: Headers, pathname: string, caller: Caller): Promise<boolean> {
+export async function checkRateLimit(headers: Headers, pathname: string): Promise<boolean> {
   const group = rateGroupFor(pathname);
   const ip = clientIp(headers);
-  return consume(`ratelimit:${group}:${caller}:${ip}`, limitFor(group, caller));
-}
-
-/**
- * Global daily cap on AI calls made by demo users, so the owner's provider keys can't be drained
- * by many IPs. DEMO_DAILY_AI_LIMIT (default 300); 0 disables demo AI calls.
- */
-export async function checkDemoDailyBudget(now = new Date()): Promise<boolean> {
-  const raw = process.env.DEMO_DAILY_AI_LIMIT;
-  const limit = raw === undefined || raw.trim() === '' ? 300 : Number(raw);
-  if (!Number.isFinite(limit)) return true;
-  const day = now.toISOString().slice(0, 10);
-  return consume(`demo-ai:${day}`, limit, 24 * 60 * 60 * 1000, now.getTime());
+  return consume(`ratelimit:${group}:${ip}`, limitFor(group));
 }

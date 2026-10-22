@@ -5,39 +5,39 @@ jest.mock('@/modules/sync', () => ({
   ...jest.requireActual('@/modules/sync'),
   syncDocument: (...a: unknown[]) => syncDocument(...a),
 }));
+const settingsHealth = jest.fn();
 jest.mock('@/modules/settings', () => ({
   ...jest.requireActual('@/modules/settings'),
   loadSettings: jest.fn(async () => ({ uploadDest: 'both' })),
+  settingsHealth: (...a: unknown[]) => settingsHealth(...a),
 }));
 
 import { NextRequest } from 'next/server';
 import { GET as health } from '@/app/api/health/route';
-import { DELETE as endGuest, POST as startGuest } from '@/app/api/auth/guest/route';
 import { POST as sync } from '@/app/api/sync/route';
 import { encrypt } from '@/core/crypto';
-import { createGuestToken } from '@/core/guest';
 
 const SECRET = 'route-secret';
 
-async function syncRequest(fields: Record<string, string>, opts: { guest?: boolean; cookie?: string } = {}) {
+async function syncRequest(fields: Record<string, string>, opts: { cookie?: string } = {}) {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
   const headers: Record<string, string> = {};
-  if (opts.guest) headers.cookie = `docsync_guest=${await createGuestToken(SECRET)}`;
   if (opts.cookie) headers.cookie = opts.cookie;
   return new NextRequest('http://localhost/api/sync', { method: 'POST', body: form, headers });
 }
 
 const okOutcome = (value: unknown) => ({ status: 'ok', value, ms: 1 });
 const fieldsJson = JSON.stringify([{ key: 'donorName', label: 'Donor Name', value: 'Asha' }]);
+const user = { email: 'u@x', accessToken: 't' };
 
 describe('API routes', () => {
   const saved = { ...process.env };
   beforeEach(() => {
     process.env = { ...saved, NEXTAUTH_SECRET: SECRET };
-    delete process.env.MODULE_DEMO;
     getToken.mockReset().mockResolvedValue(null);
     syncDocument.mockReset();
+    settingsHealth.mockReset().mockImplementation(jest.requireActual('@/modules/settings').settingsHealth);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterAll(() => { process.env = saved; });
@@ -49,47 +49,50 @@ describe('API routes', () => {
     const body = await res.json();
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(body).toMatchObject({ environment: 'staging', version: 'sha123' });
-    expect(Object.keys(body.modules).sort()).toEqual(['ai', 'demo', 'extraction', 'media', 'notion', 'settings', 'sheets', 'transcription']);
+    expect(Object.keys(body.modules).sort()).toEqual(['ai', 'extraction', 'media', 'notion', 'settings', 'sheets', 'transcription']);
     expect(['ok', 'degraded']).toContain(body.status);
   });
 
-  it('guest session: issued as an httpOnly cookie, refused when demo is off, cleared on DELETE', async () => {
-    const res = await startGuest();
-    const cookie = res.cookies.get('docsync_guest');
-    expect(cookie?.httpOnly).toBe(true);
-    expect(cookie?.value).toMatch(/^v1\./);
+  it('GET /api/health is degraded while settings storage is unreachable, and never shows internal errors', async () => {
+    settingsHealth.mockResolvedValue({ enabled: true, configured: true, persistent: false, persistence: 'unreachable', circuit: 'open' });
+    let body = await (await health()).json();
+    expect(body.status).toBe('degraded');
+    expect(body.modules.settings).toMatchObject({ persistent: false, persistence: 'unreachable', circuit: 'open' });
 
-    process.env.MODULE_DEMO = 'off';
-    expect((await startGuest()).status).toBe(403);
-
-    expect((await endGuest()).cookies.get('docsync_guest')?.value).toBe('');
+    settingsHealth.mockRejectedValue(new Error('7 PERMISSION_DENIED in project docsyncai1, see https://console.developers.google.com'));
+    body = await (await health()).json();
+    expect(body.modules.settings).toEqual({ enabled: false, configured: false, circuit: 'open', error: 'health check failed' });
+    expect(JSON.stringify(body)).not.toMatch(/docsyncai1|PERMISSION_DENIED|https:/);
+    expect(body.status).toBe('degraded');
   });
 
-  it('sync rejects anonymous callers and unknown profiles', async () => {
+  it('sync rejects anonymous callers (including leftover demo cookies) and unknown profiles', async () => {
     expect((await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }))).status).toBe(401);
-    expect((await sync(await syncRequest({ profileId: 'nope', fields: fieldsJson }, { guest: true }))).status).toBe(400);
+    expect((await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }, { cookie: 'docsync_guest=v1.9999999999.n.s' }))).status).toBe(401);
+    expect(syncDocument).not.toHaveBeenCalled();
+    getToken.mockResolvedValue(user);
+    expect((await sync(await syncRequest({ profileId: 'nope', fields: fieldsJson }))).status).toBe(400);
   });
 
-  it('sync: demo users cannot replace rows and cannot choose a spreadsheet', async () => {
-    expect((await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, duplicateAction: 'replace' }, { guest: true }))).status).toBe(403);
-
-    syncDocument.mockResolvedValue({ destinations: { sheets: okOutcome({ spreadsheetId: 'D' }), notion: okOutcome({}), media: okOutcome({}) }, imageLink: null, warnings: [] });
-    await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, spreadsheetId: 'victimSheet_123' }, { guest: true }));
-    expect(syncDocument.mock.calls[0][0].spreadsheetId).toBeNull();
-    expect(syncDocument.mock.calls[0][0].caller).toEqual({ isGuest: true });
+  it('sync passes the signed-in caller and a replace request through', async () => {
+    getToken.mockResolvedValue(user);
+    syncDocument.mockResolvedValue({ destinations: { sheets: okOutcome({ spreadsheetId: 'S' }), notion: okOutcome({}), media: okOutcome({}) }, imageLink: null, warnings: [] });
+    expect((await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, duplicateAction: 'replace' }))).status).toBe(200);
+    expect(syncDocument.mock.calls[0][0]).toMatchObject({ duplicateAction: 'replace', caller: { accessToken: 't', email: 'u@x' } });
   });
 
-  it('sync reports media as "not stored" when it succeeded without uploading anything (demo)', async () => {
+  it('sync reports media as "not stored" when it succeeded without uploading anything (expired Google session)', async () => {
+    getToken.mockResolvedValue({ email: 'u@x' });
     syncDocument.mockResolvedValue({
       destinations: {
         sheets: okOutcome({ spreadsheetId: 'D' }),
         notion: okOutcome({}),
-        media: okOutcome({ imageUrl: null, audioUrl: null, notes: ['Demo mode: not stored'] }),
+        media: okOutcome({ imageUrl: null, audioUrl: null, notes: ['Your Google session has expired'] }),
       },
       imageLink: null,
       warnings: [],
     });
-    const body = await (await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }, { guest: true }))).json();
+    const body = await (await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }))).json();
     expect(body.destinations.media).toEqual({ status: 'skipped', code: 'not_stored' });
     expect(body.destinations.sheets).toEqual({ status: 'success', code: 'saved' });
 
@@ -98,7 +101,7 @@ describe('API routes', () => {
       imageLink: 'https://drive/x',
       warnings: [],
     });
-    const stored = await (await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }, { guest: true }))).json();
+    const stored = await (await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }))).json();
     expect(stored.destinations.media).toEqual({ status: 'success', code: 'saved' });
   });
 
@@ -164,16 +167,16 @@ describe('API routes', () => {
     expect(input.primaryKey).toBe('receiptNumber');
     expect(input.only).toBeUndefined();
     const body = await res.json();
-    expect(body).toMatchObject({ success: true, spreadsheetId: 'NEW', mock: false });
+    expect(body).toMatchObject({ success: true, spreadsheetId: 'NEW' });
     expect(body.destinations.notion).toEqual({ status: 'skipped', code: 'not_connected', detail: 'Notion not connected' });
     expect(res.cookies.get('docsync_sheet_ngo_receipt')?.value).toBe('NEW');
 
-    // an explicit spreadsheetId wins over the cookie; demo/mock results set no cookie
-    syncDocument.mockResolvedValue({ destinations: { sheets: okOutcome({ spreadsheetId: null, mock: true }), notion: okOutcome({}), media: okOutcome({}) }, imageLink: null, warnings: [] });
-    const mockRes = await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, spreadsheetId: 'FORM' }, { cookie: 'docsync_sheet_ngo_receipt=OLD' }));
+    // an explicit spreadsheetId wins over the cookie; a failed sheet save sets no cookie
+    syncDocument.mockResolvedValue({ destinations: { sheets: { status: 'failed', error: 'x', ms: 1 }, notion: okOutcome({}), media: okOutcome({}) }, imageLink: null, warnings: [] });
+    const failedRes = await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, spreadsheetId: 'FORM' }, { cookie: 'docsync_sheet_ngo_receipt=OLD' }));
     expect(syncDocument.mock.calls[1][0].spreadsheetId).toBe('FORM');
-    expect(await mockRes.json()).toMatchObject({ mock: true, spreadsheetId: null });
-    expect(mockRes.cookies.get('docsync_sheet_ngo_receipt')).toBeUndefined();
+    expect(await failedRes.json()).toMatchObject({ spreadsheetId: null });
+    expect(failedRes.cookies.get('docsync_sheet_ngo_receipt')).toBeUndefined();
   });
 
   it('sync: `only` retries the listed destinations and ignores unknown names', async () => {
@@ -183,14 +186,6 @@ describe('API routes', () => {
     expect(syncDocument.mock.calls[0][0].only).toEqual(['notion', 'media']);
     await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson, only: 'bogus' }));
     expect(syncDocument.mock.calls[1][0].only).toBeUndefined();
-  });
-
-  it('sync: guests never get a sheet from the cookie', async () => {
-    syncDocument.mockResolvedValue({ destinations: { sheets: okOutcome({ spreadsheetId: 'D' }), notion: okOutcome({}), media: okOutcome({}) }, imageLink: null, warnings: [] });
-    const cookie = `docsync_guest=${await createGuestToken(SECRET)}; docsync_sheet_ngo_receipt=victim`;
-    const res = await sync(await syncRequest({ profileId: 'ngo-receipt', fields: fieldsJson }, { cookie }));
-    expect(syncDocument.mock.calls[0][0].spreadsheetId).toBeNull();
-    expect(res.cookies.get('docsync_sheet_ngo_receipt')).toBeUndefined();
   });
 
   it("sync: a saved primaryKey '' turns the duplicate check off; a chosen field overrides the default", async () => {

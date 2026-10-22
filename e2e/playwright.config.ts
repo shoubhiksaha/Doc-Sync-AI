@@ -1,4 +1,5 @@
 import path from 'path';
+import { loadEnvConfig } from '@next/env';
 import { defineConfig, devices } from '@playwright/test';
 
 // Three suites share this config:
@@ -9,6 +10,9 @@ import { defineConfig, devices } from '@playwright/test';
 //                      used by the post-deploy verification jobs in staging.yml / production.yml.
 // When TARGET_URL or BASE_URL is set, no local server is started.
 const remoteTarget = process.env.TARGET_URL || process.env.BASE_URL;
+// The signed-in specs sign their session cookie with the same NEXTAUTH_SECRET as the server, so
+// load the app's .env files the way `next start` does (CI sets the variables directly).
+loadEnvConfig(path.join(__dirname, '..'));
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 export default defineConfig({
