@@ -72,6 +72,25 @@ test.describe('Smoke (local, mock mode)', () => {
     expect(errors).toHaveLength(0);
   });
 
+  test('4b. The home page search filters the document apps', async ({ page, baseURL }) => {
+    await signIn(page.context(), baseURL!);
+    await page.goto('/');
+
+    const ngo = page.locator('a[href="/scan/ngo-receipt"]');
+    const factory = page.locator('a[href="/scan/factory-weight-slip"]');
+    const search = page.getByRole('searchbox', { name: 'Find a document type' });
+
+    await search.fill('weight');
+    await expect(factory).toBeVisible();
+    await expect(ngo).toHaveCount(0);
+    // Other apps mention weight too, so only the wording is fixed, not the count.
+    await expect(page.getByRole('search').getByRole('status')).toHaveText(/^Matching document types: \d+$/);
+
+    await search.fill('');
+    await expect(ngo).toBeVisible();
+    await expect(factory).toBeVisible();
+  });
+
   test('5. Extraction returns mock fields when no AI key is configured', async ({ page, baseURL }) => {
     await signIn(page.context(), baseURL!);
 
@@ -95,7 +114,7 @@ test.describe('Smoke (local, mock mode)', () => {
   });
 
   test('6. Every app reads a document and saves it, with the ADT badge on every screen', async ({ page, baseURL }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(300_000);
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     const adt = () => page.getByRole('link', { name: /An offering by ADT/ });
@@ -110,13 +129,18 @@ test.describe('Smoke (local, mock mode)', () => {
       await expect(adt(), screen).toBeVisible();
     }
 
-    for (const app of ['ngo-receipt', 'factory-weight-slip']) {
+    // Every app listed on the home page, each read from its own sample document.
+    await page.goto('/');
+    const apps = (await page.locator('a[href^="/scan/"]').evaluateAll(links => links.map(a => a.getAttribute('href')!.slice('/scan/'.length).split('?')[0])))
+      .filter((id, i, all) => all.indexOf(id) === i);
+    expect(apps).toHaveLength(28);
+    for (const app of apps) {
+      // 28 back-to-back reads exceed one address's AI rate limit, so each app scans from its own.
+      await page.setExtraHTTPHeaders({ 'x-real-ip': `e2e-${app}` });
       await page.goto(`/scan/${app}`);
       await expect(adt(), app).toBeVisible();
-      const chooser = page.waitForEvent('filechooser');
-      await page.getByRole('button', { name: 'Upload photo or PDF' }).click();
-      await (await chooser).setFiles(SAMPLE_RECEIPT);
-      await expect(page.getByRole('heading', { name: 'Check the details' })).toBeVisible({ timeout: 60_000 });
+      await page.getByRole('button', { name: /Try a sample/ }).click();
+      await expect(page.getByRole('heading', { name: 'Check the details' }), app).toBeVisible({ timeout: 60_000 });
       await page.getByRole('button', { name: 'Save to Google Sheet' }).click();
       await expect(page.getByRole('heading', { name: 'Saved', exact: true })).toBeVisible({ timeout: 30_000 });
       await expect(adt(), app).toBeVisible();

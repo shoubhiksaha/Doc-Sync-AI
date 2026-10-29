@@ -3,8 +3,34 @@
  * Pure data and functions with no server dependencies, so it is safe to import from client
  * components. To add a document type, create a profile file and add it to PROFILES.
  */
+import { brickKilnToken } from './brick-kiln-token';
+import { cableWifiReceipt } from './cable-wifi-receipt';
+import { catererMaterialBill } from './caterer-material-bill';
+import { constructionMaterialInward } from './construction-material-inward';
+import { courierRunSheet } from './courier-run-sheet';
+import { dairyCollectionSlip } from './dairy-collection-slip';
+import { decoratorChallan } from './decorator-challan';
 import { factoryWeightSlip } from './factory-weight-slip';
+import { fishAuctionChit } from './fish-auction-chit';
+import { fleetFuelExpense } from './fleet-fuel-expense';
+import { garageRepairEstimate } from './garage-repair-estimate';
+import { godownStorageReceipt } from './godown-storage-receipt';
+import { handicraftPieceRate } from './handicraft-piece-rate';
+import { handloomWeaverLog } from './handloom-weaver-log';
+import { jewelryKarigarLog } from './jewelry-karigar-log';
+import { kiranaKhata } from './kirana-khata';
+import { lorryReceipt } from './lorry-receipt';
+import { mandiAuctionSlip } from './mandi-auction-slip';
+import { medicalPrescription } from './medical-prescription';
+import { mobileRepairJobCard } from './mobile-repair-job-card';
+import { musterRoll } from './muster-roll';
 import { ngoReceipt } from './ngo-receipt';
+import { pdsDistributionLog } from './pds-distribution-log';
+import { pesticideBill } from './pesticide-bill';
+import { scrapDealerReceipt } from './scrap-dealer-receipt';
+import { streetVendorDailyFinance } from './street-vendor-daily-finance';
+import { tailoringMeasurement } from './tailoring-measurement';
+import { timberMeasurementSlip } from './timber-measurement-slip';
 import type { ComingSoonProfile, DocumentProfile, Lang, LocalizedProfileText, RecordField } from './types';
 
 export type {
@@ -14,7 +40,21 @@ export { PROFILE_GROUPS } from './types';
 export { comingSoonProfiles } from './catalog';
 export { fieldValue, findField } from './fields';
 
-const PROFILES: readonly DocumentProfile[] = [ngoReceipt, factoryWeightSlip];
+// Listed in home-page order; the home page groups them by `group`.
+const PROFILES: readonly DocumentProfile[] = [
+  // shops
+  kiranaKhata, medicalPrescription, garageRepairEstimate, mobileRepairJobCard, tailoringMeasurement, decoratorChallan,
+  // farm
+  mandiAuctionSlip, dairyCollectionSlip, pesticideBill, fishAuctionChit, catererMaterialBill,
+  // transport
+  fleetFuelExpense, lorryReceipt, courierRunSheet, godownStorageReceipt,
+  // industry
+  factoryWeightSlip, constructionMaterialInward, brickKilnToken, scrapDealerReceipt, timberMeasurementSlip, musterRoll,
+  // crafts
+  handloomWeaverLog, jewelryKarigarLog, handicraftPieceRate,
+  // community
+  ngoReceipt, cableWifiReceipt, pdsDistributionLog, streetVendorDailyFinance,
+];
 
 export function activeProfiles(): readonly DocumentProfile[] {
   return PROFILES;

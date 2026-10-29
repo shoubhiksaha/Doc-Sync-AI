@@ -18,8 +18,9 @@ down the others. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full d
 2. **Extraction Agent (`modules/extraction`, `/api/extract-freeform`)**
    - Zero-shot vision extraction of every visible field into a strict JSON schema
      (key, label, value, confidence, category), normalized field-by-field.
-   - Guided by the document profile (`modules/profiles`): context, priority fields, and
-     business-rule checks (e.g. PAN for donations above ₹2,000, tare < gross) returned as warnings.
+   - Guided by the document profile (`modules/profiles`, 28 document types in six trade groups):
+     context, priority fields, and business-rule checks (e.g. PAN for donations above ₹2,000,
+     tare < gross, totals that add up, GSTIN/IMEI/vehicle-number formats) returned as warnings.
 
 3. **Sync Orchestrator (`modules/sync`, `/api/sync`)**
    - Read-only duplicate check, then Notion and media storage in parallel, then Google Sheets.
