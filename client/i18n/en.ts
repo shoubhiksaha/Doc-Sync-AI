@@ -34,9 +34,20 @@ export const en = {
 
   'home.title': 'What are you scanning today?',
   'home.subtitle': "Take a photo. DocSync reads it, you check it, and it's added to your Google Sheet.",
-  'home.scan': 'Scan',
+  'home.search': 'Find a document type',
+  'home.searchPlaceholder': 'e.g. dairy, LR, khata',
+  'home.matches': 'Matching document types: {count}',
+  'home.noMatch': 'Nothing matches “{query}”. Try a shorter word.',
+  'home.groupsNav': 'Document types by kind of work',
   'home.comingSoon': '{count} more document types are coming soon',
   'home.footer': 'Documents are processed in memory and sent only to the places you choose. DocSync keeps no copy in its own database.',
+
+  'group.shops': 'Shops & services',
+  'group.farm': 'Farm, dairy & food',
+  'group.transport': 'Transport & storage',
+  'group.industry': 'Factory & construction',
+  'group.crafts': 'Crafts & artisans',
+  'group.community': 'Community & collections',
 
   'recent.title': 'Recent scans on this device',
   'recent.status.offline': 'Waiting to be processed',

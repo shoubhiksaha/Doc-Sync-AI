@@ -108,6 +108,28 @@
           }
         ]
       }
+    },
+    {
+      "files": [
+        "__tests__/**/*.ts",
+        "__tests__/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/lib/*",
+                  "**/lib/*"
+                ],
+                "message": "lib/ was replaced by core/ (shared kernel) and modules/ (feature modules). See docs/ARCHITECTURE.md."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

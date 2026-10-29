@@ -1,4 +1,6 @@
+import { profileProblems } from '../helpers/profile-contract';
 import {
+  PROFILE_GROUPS,
   activeProfiles,
   comingSoonProfiles,
   deriveFields,
@@ -15,20 +17,34 @@ import {
 const f = (key: string, value: string, label = key): RecordField => ({ key, label, value });
 
 describe('modules/profiles', () => {
-  it('registers the active profiles and keeps them out of coming-soon', () => {
-    const ids = activeProfiles().map(p => p.id);
-    expect(ids).toEqual(['ngo-receipt', 'factory-weight-slip']);
-    expect(comingSoonProfiles.some(p => p.title === 'Factory Scrap Weight-Slips')).toBe(false);
+  it('registers all 28 document apps, with nothing left in coming-soon', () => {
+    expect(activeProfiles()).toHaveLength(28);
+    expect(getProfile('ngo-receipt')?.id).toBe('ngo-receipt');
+    expect(getProfile('muster-roll')?.id).toBe('muster-roll');
+    expect(comingSoonProfiles).toEqual([]);
     expect(getProfile('nope')).toBeUndefined();
     expect(getProfile(null)).toBeUndefined();
   });
 
-  it('every active profile is complete', () => {
+  it.each(activeProfiles().map(p => [p.id, p] as const))('%s meets the profile contract', (_id, p) => {
+    expect(profileProblems(p)).toEqual([]);
+  });
+
+  it('keeps ids, sheet tabs and sample files unique, and fills every home-page group', () => {
+    const unique = (values: string[]) => new Set(values).size === values.length;
+    expect(unique(activeProfiles().map(p => p.id))).toBe(true);
+    expect(unique(activeProfiles().map(p => p.sheetTab.toLowerCase()))).toBe(true);
+    expect(unique(activeProfiles().map(p => p.sampleDocument?.href ?? p.id))).toBe(true);
+    for (const group of PROFILE_GROUPS) expect(activeProfiles().some(p => p.group === group)).toBe(true);
+  });
+
+  it('gives each Notion property one type across apps (they share one database)', () => {
+    const types = new Map<string, Set<string>>();
     for (const p of activeProfiles()) {
-      expect(p.sheetTab).toMatch(/^\w+$/);
-      expect(p.mockFields.length).toBeGreaterThan(0);
-      expect(p.extraction.priorityFields.length).toBeGreaterThan(0);
+      for (const prop of p.notion.properties) types.set(prop.name, (types.get(prop.name) ?? new Set()).add(prop.type));
     }
+    const clashes = [...types].filter(([, t]) => t.size > 1).map(([name, t]) => `${name}: ${[...t].join('/')}`);
+    expect(clashes).toEqual([]);
   });
 
   it('findField matches by key or label, ignoring case and punctuation', () => {
@@ -89,11 +105,12 @@ describe('modules/profiles', () => {
     expect(names).toEqual(expect.arrayContaining(['Amount', 'PAN', 'Gross Weight', 'Tare Weight', 'Net Weight']));
   });
 
-  it('every active profile has a duplicate-check field that it actually extracts', () => {
-    for (const p of activeProfiles()) {
-      expect(p.duplicateKey).toBeTruthy();
+  it('a duplicate-check field, where a profile has one, is a field it actually extracts', () => {
+    for (const p of activeProfiles().filter(p => p.duplicateKey)) {
       expect(p.mockFields.map(m => m.key)).toContain(p.duplicateKey);
     }
+    // Registers and passbooks have no unique number, so these leave the duplicate check to the user.
+    expect(getProfile('muster-roll')?.duplicateKey).toBeUndefined();
   });
 
   it('localizes profile copy, falling back to English', () => {

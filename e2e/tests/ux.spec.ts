@@ -35,6 +35,8 @@ test.describe('UX (local, mock mode)', () => {
 
     await page.locator('a[href="/scan/ngo-receipt"]').click();
     await expect(page.getByRole('heading', { name: /Add a photo/ })).toBeVisible();
+    // The page title is streamed after the content on a client-side navigation.
+    await expect(page).toHaveTitle(/^Scan: .* · DocSync AI$/);
     await expectAccessible(page, 'capture');
 
     // Extraction starts by itself once a document is added.

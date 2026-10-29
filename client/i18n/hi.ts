@@ -32,9 +32,20 @@ export const hi: Record<MessageKey, string> = {
 
   'home.title': 'आज आप क्या स्कैन कर रहे हैं?',
   'home.subtitle': 'फ़ोटो लें। DocSync उसे पढ़ता है, आप जाँचते हैं, और वह आपकी Google शीट में जुड़ जाता है।',
-  'home.scan': 'स्कैन करें',
+  'home.search': 'दस्तावेज़ का प्रकार खोजें',
+  'home.searchPlaceholder': 'जैसे डेयरी, LR, खाता',
+  'home.matches': 'मिलते-जुलते दस्तावेज़: {count}',
+  'home.noMatch': '“{query}” से कुछ नहीं मिला। छोटा शब्द लिखकर देखें।',
+  'home.groupsNav': 'काम के हिसाब से दस्तावेज़',
   'home.comingSoon': '{count} और तरह के दस्तावेज़ जल्द आ रहे हैं',
   'home.footer': 'दस्तावेज़ सिर्फ़ मेमोरी में प्रोसेस होते हैं और सिर्फ़ उन्हीं जगहों पर भेजे जाते हैं जो आप चुनते हैं। DocSync अपने डेटाबेस में कोई कॉपी नहीं रखता।',
+
+  'group.shops': 'दुकानें और सेवाएँ',
+  'group.farm': 'खेती, डेयरी और खाना',
+  'group.transport': 'ढुलाई और गोदाम',
+  'group.industry': 'कारख़ाना और निर्माण',
+  'group.crafts': 'कारीगरी और हस्तकला',
+  'group.community': 'समुदाय और वसूली',
 
   'recent.title': 'इस डिवाइस पर हाल के स्कैन',
   'recent.status.offline': 'प्रोसेस होने का इंतज़ार',

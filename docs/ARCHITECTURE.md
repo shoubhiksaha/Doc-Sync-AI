@@ -113,6 +113,9 @@ saved preference, else the profile's `duplicateKey` (`''` saved by the user turn
 
 The UI follows the same idea: small parts with clear contracts.
 
+- **Home page** (`app/components/AppPicker.tsx`): the apps grouped by `profile.group`, with jump
+  links per group and a search that matches every typed word against the English and Hindi title,
+  document name and description (case, accents and the Hindi nukta are ignored).
 - **Scan flow** (`client/scan-flow.ts`): `capture → extracting → review → saving → done` as a pure
   reducer. Components render a step and dispatch actions; the transitions (templates, auto-save,
   retries, "nothing saved → stay on review") are unit-tested without a browser.
@@ -145,8 +148,18 @@ The UI follows the same idea: small parts with clear contracts.
 ## Changing things independently
 
 - **Add or change a document type:** edit or add one file in `modules/profiles/` and list it in
-  `modules/profiles/index.ts`. Extraction prompts, Sheets tab, Notion properties, mock data and
-  business-rule warnings all come from the profile. Nothing else changes.
+  `modules/profiles/index.ts`. Extraction prompts, Sheets tab, Notion properties, mock data,
+  home-page group and business-rule warnings all come from the profile. Nothing else changes.
+  - Each profile has a contract test (`__tests__/helpers/profile-contract.ts`): Hindi copy, a mock
+    that passes its own checks, Notion properties that match its fields, a sample document.
+  - Draw its fictional sample as `scripts/samples/<id>.html` and run
+    `node scripts/samples/render.mjs <id>` to write `public/samples/<id>.jpg`.
+  - Shared checks (vehicle numbers, GSTIN, mobile numbers, money tolerance, Aadhaar masking) live
+    in `modules/profiles/checks.ts`.
+  - All apps share one Notion database, so a property name means the same type everywhere and a
+    profile writes at most 3 properties; the registry test enforces both.
+  - A page with many entries (a khata page, a muster roll) is one row: totals as fields plus one
+    compact "Items"/"Entries" text field. Profiles never store a full Aadhaar number.
 - **Swap a provider or model:** `modules/ai/providers.ts`, or set `OPENAI_VISION_MODEL`,
   `GEMINI_VISION_MODEL`, `GROQ_VISION_MODEL`, `ANTHROPIC_VISION_MODEL` per environment.
 - **Change how Sheets lays out rows:** `modules/sheets/a1.ts` (pure functions, fully unit-tested).

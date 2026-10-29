@@ -11,8 +11,10 @@ export const factoryWeightSlip: DocumentProfile = {
   title: 'Factory Scrap Weight-Slips',
   documentName: 'Factory Weight-Slip',
   description: 'Extract vehicle no, gross weight, tare weight, and timestamp from kachha bills.',
+  group: 'industry',
   sheetTab: 'Factory_Slips',
   sheetTitle: 'DocSync — Factory Weight Slips',
+  sampleDocument: { href: '/samples/factory-weight-slip.jpg', fileName: 'Sample_Factory_Weight_Slip.jpg' },
   duplicateKey: 'slipNumber',
   translations: {
     hi: {
@@ -25,13 +27,17 @@ export const factoryWeightSlip: DocumentProfile = {
     context: 'This is an Indian factory or scrap weighbridge slip (kachha bill). Typical fields: slip number, date and time, vehicle number, material, party name, gross weight, tare weight and net weight with units.',
     priorityFields: ['Slip Number', 'Date', 'Vehicle Number', 'Gross Weight', 'Tare Weight', 'Net Weight'],
   },
+  // The values on public/samples/factory-weight-slip.jpg, so "Try a sample" without an AI key shows what's on it.
   mockFields: [
-    { key: 'slipNumber', label: 'Slip Number', value: 'WB-2023-0789', confidence: 92, category: 'identity' },
-    { key: 'date', label: 'Date', value: '24-Oct-2023', confidence: 95, category: 'date' },
-    { key: 'vehicleNumber', label: 'Vehicle Number', value: 'MH-12-AB-1234', confidence: 93, category: 'identity' },
-    { key: 'material', label: 'Material', value: 'Iron Scrap', confidence: 80, category: 'other' },
-    { key: 'grossWeight', label: 'Gross Weight', value: '15000', confidence: 97, category: 'financial' },
-    { key: 'tareWeight', label: 'Tare Weight', value: '5000', confidence: 96, category: 'financial' },
+    { key: 'slipNumber', label: 'Slip Number', value: 'WB-26-11873', confidence: 92, category: 'identity' },
+    { key: 'date', label: 'Date', value: '18-10-2026', confidence: 95, category: 'date' },
+    { key: 'vehicleNumber', label: 'Vehicle Number', value: 'MH 14 KQ 7721', confidence: 93, category: 'identity' },
+    { key: 'party', label: 'Party', value: 'Kalyani Scrap Traders', confidence: 90, category: 'identity' },
+    { key: 'material', label: 'Material', value: 'MS Scrap (HMS 1)', confidence: 88, category: 'other' },
+    { key: 'grossWeight', label: 'Gross Weight', value: '24860', confidence: 97, category: 'financial' },
+    { key: 'tareWeight', label: 'Tare Weight', value: '9340', confidence: 96, category: 'financial' },
+    { key: 'netWeight', label: 'Net Weight', value: '15520', confidence: 97, category: 'financial' },
+    { key: 'charges', label: 'Charges', value: '₹150', confidence: 90, category: 'financial' },
   ],
   notion: {
     titleFrom: ['vehicleNumber', 'vehicleNo', 'vehicle'],

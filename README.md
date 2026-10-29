@@ -36,7 +36,7 @@ npm run setup:hooks                 # local pre-push guard (secret scan, no dire
 
 DocSync is split into independent modules — `ai`, `extraction`, `transcription`, `sheets`, `notion`, `media`, `settings`, `profiles` and the `sync` orchestrator — each with one public entry point. Every call between them has a timeout, a kill switch (`MODULE_<NAME>=off`) and a circuit breaker, so **a failure in one module never takes down the others**: if Notion is down, rows still reach Google Sheets; if transcription fails, scanning still works. `GET /api/health` reports the state of every module.
 
-Each document type (NGO receipts, factory weight slips, …) is a self-contained profile in `modules/profiles/`, so a document type can be added or changed without touching the rest.
+Each of the 28 document types (kirana khatas, mandi slips, lorry receipts, weight slips, muster rolls, NGO receipts, …) is a self-contained profile in `modules/profiles/`, so a document type can be added or changed without touching the rest. The home page groups them by trade (shops, farm & food, transport, factory & construction, crafts, community) and has a search box that works in English or Hindi. Every app has a fictional sample document to try (`public/samples/`, rendered from `scripts/samples/`).
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 

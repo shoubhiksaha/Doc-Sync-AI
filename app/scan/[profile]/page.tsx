@@ -1,7 +1,16 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProfile, localizedProfile } from '@/modules/profiles';
 import { serverI18n } from '@/client/i18n/server';
 import ScanClient from './ScanClient';
+
+/** "Scan: Lorry Receipt (LR) · DocSync AI", so each app's tab and history entry is distinct. */
+export async function generateMetadata({ params }: { params: Promise<{ profile: string }> }): Promise<Metadata> {
+  const profile = getProfile((await params).profile);
+  if (!profile) return {};
+  const { lang, t } = await serverI18n();
+  return { title: `${t('scan.title', { name: localizedProfile(profile, lang).documentName })} · DocSync AI` };
+}
 
 export default async function ScanPage({
   params,
