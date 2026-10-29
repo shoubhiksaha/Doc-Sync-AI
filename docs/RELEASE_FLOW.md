@@ -1,12 +1,13 @@
 # Release flow: staging first, then main, never staging → main
 
 DocSync AI has two environments inside one Vercel project. Each environment has its own Vercel
-environment variables, its own Firestore database and its own demo Google Sheet.
+environment variables and its own Firestore database. Rows always go to each signed-in user's own
+Google Sheet, so there is no shared sheet to keep apart.
 
-| Environment | Git branch | Vercel environment | Firestore database | Demo sheet | URL |
-|---|---|---|---|---|---|
-| Staging | `staging` | Preview (aliased to `STAGING_DOMAIN` when set) | `staging` (`FIRESTORE_DATABASE_ID=staging`) | staging `GOOGLE_SHEET_ID` | `STAGING_DOMAIN`, or the preview URL printed by the deploy job |
-| Production | `main` | Production | `(default)` | production `GOOGLE_SHEET_ID` | https://docsync.analogdigital.tech |
+| Environment | Git branch | Vercel environment | Firestore database | URL |
+|---|---|---|---|---|
+| Staging | `staging` | Preview (aliased to `STAGING_DOMAIN` when set) | `staging` (`FIRESTORE_DATABASE_ID=staging`) | `STAGING_DOMAIN`, or the preview URL printed by the deploy job |
+| Production | `main` | Production | `(default)` | https://docsync.analogdigital.tech |
 
 Shared by both: the Google OAuth client, the Firebase project, the AI provider accounts and
 billing. A user who signs in on staging also exists in production, but their saved settings in
@@ -27,7 +28,7 @@ How the split is wired:
 ```mermaid
 flowchart LR
     F["feature/my-change<br/>(branched from main)"] -- "PR #1 (merge commit)" --> S[staging]
-    S -- "CI + owner approval" --> SE[("Vercel Preview · Firestore staging · staging demo sheet")]
+    S -- "CI + owner approval" --> SE[("Vercel Preview · Firestore staging")]
     F -- "PR #2, same branch,<br/>pushed from your machine" --> M[main]
     M -- "provenance check + CI<br/>+ owner approval" --> PE[("Vercel Production · Firestore (default) · docsync.analogdigital.tech")]
     S -. "blocked" .-x M
@@ -42,8 +43,8 @@ flowchart LR
    workflow re-runs the quality gate and then waits for the owner to approve the deploy in the
    `staging` environment. After the deploy, "Post-Deploy Verification (Staging)" runs the
    contract tests against the staging URL.
-3. **Verify on staging.** Use the staging URL in a private window: demo mode and a Google login
-   with a test account. Staging writes to its own demo sheet and the `staging` database only.
+3. **Verify on staging.** Use the staging URL in a private window and sign in with a Google test
+   account. Staging stores settings in the `staging` database only.
 4. **Then promote the same feature branch to main from your machine:**
    ```bash
    git checkout feature/my-change
@@ -112,7 +113,6 @@ Vercel environment variables (Project → Settings → Environment Variables):
 | Variable | Preview (staging) | Production |
 |---|---|---|
 | `FIRESTORE_DATABASE_ID` | `staging` | unset or `(default)` |
-| `GOOGLE_SHEET_ID` | the staging demo sheet | the production demo sheet |
 | `NEXTAUTH_URL` | the staging URL | `https://docsync.analogdigital.tech` |
 | `APP_ENV` | optional, `staging` | optional, `production` |
 | `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, Google OAuth, service account, AI keys | set for each environment | set for each environment |

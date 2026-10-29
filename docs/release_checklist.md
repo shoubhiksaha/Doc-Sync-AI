@@ -16,8 +16,8 @@ The flow itself is described in [RELEASE_FLOW.md](RELEASE_FLOW.md). This is the 
 - [ ] Approved the `staging` deployment in Actions
 - [ ] "Post-Deploy Verification (Staging)" passed
 - [ ] Manual check on the staging URL in a private window:
-      demo mode → scan the sample NGO receipt → review fields → sync → row appears in the staging demo sheet;
-      Google login → sync creates a sheet in the test account's Drive
+      Google login with a test account → scan the sample NGO receipt → review fields → sync →
+      a sheet is created in the test account's Drive with the new row
 - [ ] `/api/health` on staging shows `environment: staging` and no unexpected `circuit: open`
 
 ## 3. Production

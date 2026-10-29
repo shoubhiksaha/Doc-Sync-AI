@@ -109,11 +109,11 @@ describe('client/scan-flow save results', () => {
     expect(saveResultFrom({ success: true }).status).toBe('saved');
     expect(saveResultFrom({ partial: true }).status).toBe('partial');
     expect(saveResultFrom({}).status).toBe('failed');
-    expect(saveResultFrom({ destinations: { sheets: saved }, mock: true, spreadsheetUrl: null }).mock).toBe(true);
+    expect(saveResultFrom({ destinations: { sheets: saved }, spreadsheetUrl: null }).spreadsheetUrl).toBeUndefined();
   });
 
   it('merges a retry without overwriting destinations that were not retried', () => {
-    const first: SaveResult = { status: 'partial', mock: false, destinations: { sheets: saved, notion: failed }, spreadsheetUrl: 'https://s', warnings: ['w1'] };
+    const first: SaveResult = { status: 'partial', destinations: { sheets: saved, notion: failed }, spreadsheetUrl: 'https://s', warnings: ['w1'] };
     expect(failedDestinations(first)).toEqual(['notion']);
     const retry = saveResultFrom({ destinations: { sheets: { status: 'skipped', code: 'not_retried' }, notion: saved }, warnings: ['w1', 'w2'] });
     const merged = mergeRetry(first, retry);

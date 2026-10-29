@@ -46,7 +46,7 @@ export async function transcribeAudio(input: TranscribeInput): Promise<string | 
   };
 
   const gemini: Runner = async key => {
-    for (const model of ['gemini-2.5-flash', 'gemini-2.0-flash']) {
+    for (const model of ['gemini-2.5-flash', 'gemini-3-flash-preview']) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },

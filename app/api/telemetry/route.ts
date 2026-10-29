@@ -10,6 +10,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const raw: unknown[] = Array.isArray(body?.events) ? body.events : body ? [body] : [];
   const events = raw.slice(0, MAX_EVENTS_PER_REQUEST).map(sanitizeEvent).filter((e): e is TelemetryEvent => e !== null);
-  logEvents(events, caller.isGuest ? 'guest' : 'user');
+  logEvents(events);
   return new NextResponse(null, { status: 204 });
 }

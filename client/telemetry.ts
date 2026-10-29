@@ -5,7 +5,7 @@
 export type TelemetryEvent =
   | 'scan_opened' | 'photo_added' | 'extract_succeeded' | 'extract_failed' | 'review_confirmed'
   | 'sync_finished' | 'sync_failed' | 'duplicate_found' | 'fields_remembered' | 'fields_forgotten'
-  | 'auto_save_cancelled' | 'retry' | 'offline_saved' | 'notion_offer' | 'demo_started'
+  | 'auto_save_cancelled' | 'retry' | 'offline_saved' | 'notion_offer'
   | 'language_changed' | 'client_error';
 
 type Props = Record<string, string | number | boolean | null | undefined>;

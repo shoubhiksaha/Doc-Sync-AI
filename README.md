@@ -1,6 +1,6 @@
 # DocSync AI - AI Agents for Bharat's Businesses
 
-[![Live Demo](https://img.shields.io/badge/Live_App-docsync.analogdigital.tech-blue?style=for-the-badge)](https://docsync.analogdigital.tech)
+[![Live App](https://img.shields.io/badge/Live_App-docsync.analogdigital.tech-blue?style=for-the-badge)](https://docsync.analogdigital.tech)
 [![Demo Video](https://img.shields.io/badge/Demo_Video-Watch_Here-red?style=for-the-badge)](https://youtu.be/4H7RTwGbt1I)
 [![Presentation](https://img.shields.io/badge/Pitch_Deck-View_Presentation-green?style=for-the-badge)](./PRESENTATION.md)
 
@@ -9,8 +9,8 @@ DocSync AI is a full-stack, mobile-first web app (PWA) designed to eliminate man
 **Track 6: AI Agents for Bharat's Businesses**
 
 ## Prerequisites
-* **Demo Mode:** Runs the full flow with NO login and NO API key from the user. Demo users get a signed, rate-limited session that uses the server's AI keys (within `DEMO_DAILY_AI_LIMIT`) and writes to one shared demo Google Sheet. Images and voice notes are not stored in demo mode.
-* **Live Mode (Optional):** Requires a Google OAuth client. Signed-in users get their own private spreadsheets and Drive folder, and can bring their own Gemini / Groq / OpenAI / Anthropic key.
+* **Google OAuth client (required):** Everyone signs in with Google. Each user gets their own private spreadsheet and Drive folder, and can bring their own Gemini / Groq / OpenAI / Anthropic key.
+* **AI keys (server):** At least one provider key, unless every user brings their own. With none at all, extraction returns sample data, which is handy for local development.
 
 All variables are documented in [`.env.example`](./.env.example).
 
@@ -18,7 +18,7 @@ All variables are documented in [`.env.example`](./.env.example).
 
 ```bash
 npm install
-npm run dev            # http://localhost:3000 → "Try the demo, no sign-in"
+npm run dev            # http://localhost:3000 → "Sign in with Google"
 ```
 
 Checks (the same ones CI runs):
@@ -58,6 +58,5 @@ See [docs/RELEASE_FLOW.md](./docs/RELEASE_FLOW.md), [docs/release_checklist.md](
 Codex orchestrated this entire application, from the Next.js App Router scaffolding to the complex multi-modal AI abstractions. 
 * **Multi-model Architecture:** Built a `UniversalAIAdapter` that routes between OpenAI, Groq, Gemini and Anthropic, with automatic fallback to the next provider on any error.
 * **Serverless Resiliency:** Solved Next.js serverless limitations by implementing client-side image compression (`HTML5 Canvas`), entirely bypassing Vercel's strict 4.5MB payload limits before hitting the backend.
-* **Seamless Testing:** A "Demo Mode" with signed guest sessions and a shared demo sheet, so hackathon judges can test the full PWA without a single configuration step.
 
 

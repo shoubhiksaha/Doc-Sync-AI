@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 
 const expectedEnvironment = process.env.EXPECTED_ENVIRONMENT;
 const expectedVersion = process.env.EXPECTED_VERSION;
-const MODULE_KEYS = ['ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings', 'demo'];
+const MODULE_KEYS = ['ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings'];
 
 test.describe(`Live environment contract (${expectedEnvironment || 'any'})`, () => {
   test.beforeAll(() => {
@@ -51,8 +51,17 @@ test.describe(`Live environment contract (${expectedEnvironment || 'any'})`, () 
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto('/login', { waitUntil: 'load', timeout: 30000 });
-    await expect(page.getByRole('button', { name: /Try the demo/ })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 15000 });
 
     expect(errors.filter((msg) => !msg.includes('net::ERR') && !msg.includes('Failed to fetch'))).toHaveLength(0);
+  });
+
+  test('4. There is no demo sign-in', async ({ page, request }) => {
+    await page.goto('/login', { waitUntil: 'load', timeout: 30000 });
+    await expect(page.getByRole('button', { name: /demo/i })).toHaveCount(0);
+
+    const guest = await request.post('/api/auth/guest', { maxRedirects: 0 });
+    expect(guest.ok()).toBe(false);
+    expect(guest.headers()['set-cookie'] || '').not.toContain('docsync_guest');
   });
 });

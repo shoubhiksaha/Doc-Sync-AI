@@ -7,7 +7,7 @@ export type Destination = 'sheets' | 'notion' | 'media';
 export const DESTINATIONS: Destination[] = ['sheets', 'notion', 'media'];
 
 export type ErrorCode =
-  | 'bad_input' | 'too_large' | 'demo_budget' | 'quota' | 'unavailable'
+  | 'bad_input' | 'too_large' | 'quota' | 'unavailable'
   | 'rate_limited' | 'network' | 'session' | 'internal';
 
 export interface DestinationResult {
@@ -45,14 +45,11 @@ export interface Extraction {
   fields: ApiField[];
   documentType?: string;
   isMock?: boolean;
-  quotaFallback?: boolean;
   warnings?: string[];
 }
 
 export interface SaveResult {
   status: 'saved' | 'partial' | 'failed';
-  /** Demo server without a demo sheet: nothing was written. */
-  mock: boolean;
   destinations: Partial<Record<Destination, DestinationResult>>;
   spreadsheetUrl?: string;
   warnings: string[];
@@ -73,7 +70,6 @@ export interface ScanState {
   error: ErrorCode | null;
   fields: ReviewField[];
   isMock: boolean;
-  quotaFallback: boolean;
   warnings: string[];
   note: string;
   audio: Blob | null;
@@ -90,7 +86,6 @@ export const initialScanState: ScanState = {
   error: null,
   fields: [],
   isMock: false,
-  quotaFallback: false,
   warnings: [],
   note: '',
   audio: null,
@@ -215,7 +210,6 @@ export function saveResultFrom(body: {
   destinations?: Partial<Record<Destination, DestinationResult>>;
   spreadsheetUrl?: string | null;
   warnings?: string[];
-  mock?: boolean;
   success?: boolean;
   partial?: boolean;
 }): SaveResult {
@@ -223,7 +217,6 @@ export function saveResultFrom(body: {
   const hasDestinations = DESTINATIONS.some((d) => destinations[d]);
   return {
     status: hasDestinations ? statusFrom(destinations) : body.success ? 'saved' : body.partial ? 'partial' : 'failed',
-    mock: Boolean(body.mock),
     destinations,
     spreadsheetUrl: body.spreadsheetUrl || undefined,
     warnings: body.warnings ?? [],
@@ -239,7 +232,6 @@ export function mergeRetry(previous: SaveResult, retry: SaveResult): SaveResult 
   }
   return {
     status: statusFrom(destinations),
-    mock: previous.mock || retry.mock,
     destinations,
     spreadsheetUrl: retry.spreadsheetUrl ?? previous.spreadsheetUrl,
     warnings: [...new Set([...previous.warnings, ...retry.warnings])],
@@ -264,7 +256,6 @@ export function scanReducer(state: ScanState, action: ScanAction): ScanState {
         error: null,
         fields,
         isMock: Boolean(action.extraction.isMock),
-        quotaFallback: Boolean(action.extraction.quotaFallback),
         warnings: action.extraction.warnings ?? [],
         autoSave: canAutoSave(fields, action.extraction, action.template),
       };

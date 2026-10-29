@@ -1,33 +1,28 @@
 /**
  * Sheets module — Google Sheets read/write for synced records.
  *
- * Signed-in users write to their own spreadsheet (OAuth, drive.file scope). Demo users can only
- * write to the configured demo sheet: a spreadsheet ID sent by a demo client is ignored, so the
- * service account can't be pointed at other sheets it has access to.
+ * Each user writes to their own spreadsheet with their own OAuth token (drive.file scope).
  */
 import { google, type sheets_v4, type drive_v3 } from 'googleapis';
-import { env, isModuleEnabled } from '@/core/env';
+import { isModuleEnabled } from '@/core/env';
 import { circuitState } from '@/core/isolation';
-import { driveQueryLiteral, ensureFolder, getGoogleAuth, hasServiceAccount, serviceAccountAuth } from '@/core/google-auth';
+import { driveQueryLiteral, ensureFolder, getGoogleAuth } from '@/core/google-auth';
 import { buildRow, columnLetter, mergeHeaders, META_COLUMNS, primaryKeyColumn, tabRange, type RowMeta, type SheetField } from './a1';
 
 export { columnLetter, mergeHeaders, sanitizeCell, buildRow, META_COLUMNS, type RowMeta, type SheetField } from './a1';
 
 export interface SheetsCaller {
   accessToken?: string;
-  isGuest: boolean;
 }
 
 const USER_SPREADSHEET_NAME = 'DocSync AI Data';
-const DEMO_SPREADSHEET_NAME = 'DocSync AI Demo Data';
 const USER_FOLDER_NAME = 'DocSync AI';
 
 type Apis = { sheets: sheets_v4.Sheets; drive: drive_v3.Drive };
 
-/** Demo callers get the service account; signed-in callers only ever their own OAuth token. */
 function apis(caller: SheetsCaller): Apis | null {
-  const auth = caller.isGuest ? serviceAccountAuth() : caller.accessToken ? getGoogleAuth(caller.accessToken) : null;
-  if (!auth) return null;
+  if (!caller.accessToken) return null;
+  const auth = getGoogleAuth(caller.accessToken);
   return {
     sheets: google.sheets({ version: 'v4', auth: auth as never }),
     drive: google.drive({ version: 'v3', auth: auth as never }),
@@ -36,10 +31,6 @@ function apis(caller: SheetsCaller): Apis | null {
 
 export function spreadsheetUrl(id: string): string {
   return `https://docs.google.com/spreadsheets/d/${id}/edit`;
-}
-
-export function isDemoSheetConfigured(): boolean {
-  return hasServiceAccount() && Boolean(env('GOOGLE_SHEET_ID') || env('GOOGLE_SHARED_FOLDER_ID'));
 }
 
 async function findSpreadsheet(drive: drive_v3.Drive, name: string, parentId?: string): Promise<string | null> {
@@ -63,25 +54,10 @@ async function moveToFolder(drive: drive_v3.Drive, fileId: string, folderName: s
   }
 }
 
-/** Demo users: the configured demo sheet only. Users: their sheet, or find/create "DocSync AI Data". */
-async function resolveSpreadsheetId(api: Apis, caller: SheetsCaller, clientSpreadsheetId?: string | null, create = true): Promise<string | null> {
-  const demoSheet = env('GOOGLE_SHEET_ID');
-
-  if (caller.isGuest) {
-    if (demoSheet) return demoSheet;
-    const folder = env('GOOGLE_SHARED_FOLDER_ID');
-    if (!folder) return null;
-    const found = await findSpreadsheet(api.drive, DEMO_SPREADSHEET_NAME, folder);
-    if (found || !create) return found;
-    const created = await api.drive.files.create({
-      requestBody: { name: DEMO_SPREADSHEET_NAME, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [folder] },
-      fields: 'id',
-    });
-    return created.data.id ?? null;
-  }
-
+/** The user's chosen sheet, or find/create "DocSync AI Data" in their Drive. */
+async function resolveSpreadsheetId(api: Apis, clientSpreadsheetId?: string | null, create = true): Promise<string | null> {
   const clientId = clientSpreadsheetId?.trim();
-  if (clientId && clientId !== demoSheet && !clientId.startsWith('demo-sheet-') && /^[A-Za-z0-9_-]{10,}$/.test(clientId)) {
+  if (clientId && /^[A-Za-z0-9_-]{10,}$/.test(clientId)) {
     return clientId;
   }
   const found = await findSpreadsheet(api.drive, USER_SPREADSHEET_NAME);
@@ -165,28 +141,11 @@ export interface CreateSheetInput {
 export interface SheetRef {
   spreadsheetId: string;
   spreadsheetUrl: string;
-  mock?: boolean;
   message: string;
 }
 
 export async function createSheet(input: CreateSheetInput): Promise<SheetRef> {
   const headers = [...input.columns.map(c => c.label || c.key), ...META_COLUMNS.map(m => m.label)];
-
-  if (input.caller.isGuest) {
-    const api = isDemoSheetConfigured() ? apis(input.caller) : null;
-    const spreadsheetId = api ? await resolveSpreadsheetId(api, input.caller) : null;
-    if (!api || !spreadsheetId) {
-      const demoId = `demo-sheet-${Date.now()}`;
-      return { spreadsheetId: demoId, spreadsheetUrl: '', mock: true, message: `Sheet "${input.title}" prepared (Demo Mode — not saved to a real sheet).` };
-    }
-    const tab = await ensureTab(api, spreadsheetId, input.tab);
-    if (tab.headers.every(h => !String(h).trim())) await writeHeaders(api, spreadsheetId, input.tab, tab.sheetId, headers, true);
-    return {
-      spreadsheetId,
-      spreadsheetUrl: spreadsheetUrl(spreadsheetId),
-      message: 'Demo mode writes to a shared demo sheet. Sign in with Google to get your own private sheet.',
-    };
-  }
 
   const api = apis(input.caller);
   if (!api) throw new Error('Your Google session has expired. Please sign in again.');
@@ -220,10 +179,9 @@ export interface DuplicateReport {
 
 /** Read-only check run before anything is written, so a duplicate never leaves half a sync behind. */
 export async function findDuplicates(input: DuplicateCheckInput): Promise<DuplicateReport | null> {
-  if (input.caller.isGuest && !isDemoSheetConfigured()) return null;
   const api = apis(input.caller);
   if (!api) return null;
-  const spreadsheetId = await resolveSpreadsheetId(api, input.caller, input.spreadsheetId, false);
+  const spreadsheetId = await resolveSpreadsheetId(api, input.spreadsheetId, false);
   if (!spreadsheetId) return null;
   const headers = await readHeaders(api, spreadsheetId, input.tab);
   if (!headers?.length) return null;
@@ -244,22 +202,18 @@ export interface AppendInput {
 }
 
 export interface AppendResult {
-  spreadsheetId: string | null;
+  spreadsheetId: string;
   spreadsheetUrl?: string;
-  mock?: boolean;
-  action: 'append' | 'replace' | 'none';
+  action: 'append' | 'replace';
   rows: number;
 }
 
 export async function appendRecord(input: AppendInput): Promise<AppendResult> {
-  if (input.caller.isGuest && !isDemoSheetConfigured()) {
-    return { spreadsheetId: null, mock: true, action: 'none', rows: 0 };
-  }
   const api = apis(input.caller);
-  if (!api) throw new Error(input.caller.isGuest ? 'The demo service account is not configured.' : 'Your Google session has expired. Please sign in again.');
+  if (!api) throw new Error('Your Google session has expired. Please sign in again.');
 
-  const spreadsheetId = await resolveSpreadsheetId(api, input.caller, input.spreadsheetId);
-  if (!spreadsheetId) return { spreadsheetId: null, mock: true, action: 'none', rows: 0 };
+  const spreadsheetId = await resolveSpreadsheetId(api, input.spreadsheetId);
+  if (!spreadsheetId) throw new Error('Your Google Sheet could not be found or created.');
 
   const tab = await ensureTab(api, spreadsheetId, input.tab);
   const wasEmpty = tab.headers.every(h => !String(h).trim());
@@ -269,7 +223,7 @@ export async function appendRecord(input: AppendInput): Promise<AppendResult> {
   const row = buildRow(headers, input.fields, input.meta);
   const lastColumn = columnLetter(headers.length);
 
-  if (input.duplicateAction === 'replace' && input.primaryKey && !input.caller.isGuest) {
+  if (input.duplicateAction === 'replace' && input.primaryKey) {
     const pk = primaryKeyColumn(headers, input.fields, input.primaryKey);
     const rows = pk ? await matchingRows(api, spreadsheetId, input.tab, pk.index, pk.value) : [];
     if (rows.length) {
@@ -298,7 +252,6 @@ export function sheetsHealth() {
   return {
     enabled: isModuleEnabled('sheets'),
     configured: true, // signed-in users always have Sheets via OAuth
-    demoSheet: isDemoSheetConfigured(),
     circuit: circuitState('sheets'),
   };
 }

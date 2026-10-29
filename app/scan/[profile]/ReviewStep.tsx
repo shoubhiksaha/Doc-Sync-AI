@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState, type Dispatch, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type Dispatch, type FormEvent } from 'react';
 import { Check, Eye, Pencil, Plus, RotateCcw, X } from 'lucide-react';
 import { useI18n } from '@/client/i18n/I18nProvider';
 import { activeFields, fieldStatus, needsAttention, type ReviewField, type ScanAction, type ScanState } from '@/client/scan-flow';
@@ -13,7 +13,6 @@ import styles from './scan.module.css';
 interface ReviewStepProps {
   state: ScanState;
   dispatch: Dispatch<ScanAction>;
-  isGuest: boolean;
   saving: boolean;
   countdown: number;
   /** Field key used for the duplicate check; '' means "don't check". */
@@ -29,6 +28,15 @@ function FieldRow({ field, dispatch }: { field: ReviewField; dispatch: Dispatch<
   const [renaming, setRenaming] = useState(false);
   const [label, setLabel] = useState(field.label);
   const status = fieldStatus(field);
+  const valueRef = useRef<HTMLTextAreaElement>(null);
+
+  // Browsers without CSS `field-sizing` (Firefox, older Safari) grow the box here instead.
+  useEffect(() => {
+    const el = valueRef.current;
+    if (!el || CSS.supports('field-sizing', 'content')) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [field.value]);
 
   const saveName = (e: FormEvent) => {
     e.preventDefault();
@@ -53,11 +61,15 @@ function FieldRow({ field, dispatch }: { field: ReviewField; dispatch: Dispatch<
             {status === 'missing' && <Badge tone="danger">{t('review.badgeMissing')}</Badge>}
           </div>
         )}
-        <input
+        {/* A textarea so long values (names, addresses) wrap instead of being cut off on phones. */}
+        <textarea
+          ref={valueRef}
           id={inputId}
-          className={ui.input}
+          className={`${ui.input} ${styles.fieldValue}`}
+          rows={1}
           value={field.value}
           onChange={e => dispatch({ type: 'edit', id: field.id, value: e.target.value })}
+          onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
           aria-invalid={status === 'missing' || undefined}
         />
       </div>
@@ -83,7 +95,7 @@ function PhotoViewer({ urls, open, onClose }: { urls: string[]; open: boolean; o
   );
 }
 
-export default function ReviewStep({ state, dispatch, isGuest, saving, countdown, duplicateKey, onDuplicateKey, onSave, onStartOver }: ReviewStepProps) {
+export default function ReviewStep({ state, dispatch, saving, countdown, duplicateKey, onDuplicateKey, onSave, onStartOver }: ReviewStepProps) {
   const { t } = useI18n();
   const urls = usePageUrls(state.pages);
   const [page, setPage] = useState(0);
@@ -136,8 +148,8 @@ export default function ReviewStep({ state, dispatch, isGuest, saving, countdown
         </div>
 
         {state.isMock && (
-          <Notice tone="warning" title={state.quotaFallback ? t('review.quotaTitle') : t('review.sampleTitle')} urgent>
-            <p>{state.quotaFallback ? t('review.quotaBody') : t('review.sampleBody')}</p>
+          <Notice tone="warning" title={t('review.sampleTitle')} urgent>
+            <p>{t('review.sampleBody')}</p>
           </Notice>
         )}
         {state.error && <Notice tone="danger" title={t('error.saveTitle')} urgent><p>{t(`error.${state.error}`)}</p></Notice>}
@@ -209,7 +221,7 @@ export default function ReviewStep({ state, dispatch, isGuest, saving, countdown
           <span className={styles.count}>{t('review.fieldCount', { count: active.length })}</span>
           <Button onClick={onStartOver} disabled={saving}>{t('review.startOver')}</Button>
           <Button variant="primary" size="lg" wrap loading={saving} disabled={active.length === 0} onClick={onSave}>
-            {saving ? t('common.saving') : isGuest ? t('review.saveDemo') : t('review.save')}
+            {saving ? t('common.saving') : t('review.save')}
           </Button>
         </div>
       </div>

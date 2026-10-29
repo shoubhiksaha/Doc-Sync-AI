@@ -46,7 +46,7 @@ export interface DocumentProfile {
     /** Fields the model should always look for. */
     priorityFields: string[];
   };
-  /** Returned when no AI provider is configured (demo / CI). */
+  /** Returned when no AI provider is configured (local development / CI). */
   mockFields: RecordField[];
   notion: {
     titleFrom: string[];

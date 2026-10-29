@@ -2,7 +2,7 @@ name: Staging Deploy
 
 # A feature branch merged into `staging` (via PR, merge commit) is tested again and then
 # deployed to the staging environment: the Vercel "Preview" environment (aliased to
-# vars.STAGING_DOMAIN when set), Firestore database "staging" and its own demo sheet.
+# vars.STAGING_DOMAIN when set) and Firestore database "staging".
 # The deploy job waits for the owner's approval on the `staging` GitHub environment.
 on:
   push:

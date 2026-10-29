@@ -33,11 +33,10 @@ export type ModuleName =
   | 'sheets'
   | 'notion'
   | 'media'
-  | 'settings'
-  | 'demo';
+  | 'settings';
 
 export const MODULE_NAMES: readonly ModuleName[] = [
-  'ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings', 'demo',
+  'ai', 'extraction', 'transcription', 'sheets', 'notion', 'media', 'settings',
 ];
 
 /**
@@ -47,8 +46,4 @@ export const MODULE_NAMES: readonly ModuleName[] = [
 export function isModuleEnabled(name: ModuleName): boolean {
   const raw = process.env[`MODULE_${name.toUpperCase()}`]?.trim().toLowerCase();
   return !(raw === 'off' || raw === 'false' || raw === '0' || raw === 'disabled');
-}
-
-export function isDemoEnabled(): boolean {
-  return isModuleEnabled('demo');
 }

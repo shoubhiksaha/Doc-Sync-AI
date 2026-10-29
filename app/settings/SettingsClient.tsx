@@ -99,7 +99,6 @@ export default function SettingsClient({ profiles, notionJustConnected }: Settin
   };
 
   const detected = detectProvider(keyInput);
-  const isGuest = settings?.isGuest ?? false;
   const notionConnected = Boolean(settings?.hasNotionKey && settings?.hasNotionDbId);
 
   return (
@@ -157,50 +156,42 @@ export default function SettingsClient({ profiles, notionJustConnected }: Settin
               description={t('settings.notion.body')}
               aside={notionConnected ? <Badge tone="success">{t('settings.notion.connected')}</Badge> : undefined}
             >
-              {isGuest ? (
-                <p className={styles.hint}>{t('settings.notion.guest')}</p>
-              ) : (
-                <div className={styles.row}>
-                  <ButtonLink href="/api/auth/notion" native variant={notionConnected ? 'secondary' : 'primary'} icon={<BookOpen size={18} aria-hidden />}>
-                    {notionConnected ? t('settings.notion.reconnect') : t('settings.notion.connect')}
-                  </ButtonLink>
-                  {(settings.hasNotionKey || settings.hasNotionDbId) && (
-                    <Button variant="danger" loading={busy === 'notion'} onClick={() => update('notion', { notionKey: '', notionDbId: '' }, t('settings.notion.disconnected'))}>
-                      {t('settings.notion.disconnect')}
-                    </Button>
-                  )}
-                </div>
-              )}
+              <div className={styles.row}>
+                <ButtonLink href="/api/auth/notion" native variant={notionConnected ? 'secondary' : 'primary'} icon={<BookOpen size={18} aria-hidden />}>
+                  {notionConnected ? t('settings.notion.reconnect') : t('settings.notion.connect')}
+                </ButtonLink>
+                {(settings.hasNotionKey || settings.hasNotionDbId) && (
+                  <Button variant="danger" loading={busy === 'notion'} onClick={() => update('notion', { notionKey: '', notionDbId: '' }, t('settings.notion.disconnected'))}>
+                    {t('settings.notion.disconnect')}
+                  </Button>
+                )}
+              </div>
             </Card>
 
             <Card titleId="media-title" title={t('settings.media.title')}>
-              {isGuest ? (
-                <p className={styles.hint}>{t('settings.media.guest')}</p>
-              ) : (
-                <fieldset className={styles.options}>
-                  <legend className="sr-only">{t('settings.media.title')}</legend>
-                  {([
-                    ['gdrive', t('settings.media.gdrive'), t('settings.media.gdriveHint')],
-                    ['notion', t('settings.media.notion'), t('settings.media.notionHint')],
-                    ['both', t('settings.media.both'), t('settings.media.bothHint')],
-                  ] as [UploadDest, string, string][]).map(([value, label, hint]) => (
-                    <label key={value} className={styles.option}>
-                      <input
-                        type="radio"
-                        name="uploadDest"
-                        value={value}
-                        checked={settings.uploadDest === value}
-                        disabled={busy === 'media'}
-                        onChange={() => update('media', { uploadDest: value })}
-                      />
-                      <span>
-                        <span className={styles.optionLabel}>{label}</span>
-                        <span className={styles.hint}>{hint}</span>
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-              )}
+              <fieldset className={styles.options}>
+                <legend className="sr-only">{t('settings.media.title')}</legend>
+                {([
+                  ['gdrive', t('settings.media.gdrive'), t('settings.media.gdriveHint')],
+                  ['notion', t('settings.media.notion'), t('settings.media.notionHint')],
+                  ['both', t('settings.media.both'), t('settings.media.bothHint')],
+                ] as [UploadDest, string, string][]).map(([value, label, hint]) => (
+                  <label key={value} className={styles.option}>
+                    <input
+                      type="radio"
+                      name="uploadDest"
+                      value={value}
+                      checked={settings.uploadDest === value}
+                      disabled={busy === 'media'}
+                      onChange={() => update('media', { uploadDest: value })}
+                    />
+                    <span>
+                      <span className={styles.optionLabel}>{label}</span>
+                      <span className={styles.hint}>{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
             </Card>
 
             <Card titleId="prefs-title" title={t('settings.profiles.title')} description={t('settings.profiles.body')}>
@@ -229,13 +220,13 @@ export default function SettingsClient({ profiles, notionJustConnected }: Settin
                 <input
                   type="checkbox"
                   checked={settings.isPersistent}
-                  disabled={isGuest || busy === 'sync'}
+                  disabled={busy === 'sync'}
                   onChange={e => update('sync', { persistent: e.target.checked })}
                 />
                 <span>
                   <span className={styles.optionLabel}>{t('settings.sync.title')}</span>
                   <span className={styles.hint}>
-                    {isGuest ? t('settings.sync.guest') : settings.isPersistent ? t('settings.sync.on') : t('settings.sync.off')}
+                    {settings.isPersistent ? t('settings.sync.on') : t('settings.sync.off')}
                   </span>
                 </span>
               </label>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorText, resolveCaller, unauthorized } from '@/core/http';
-import { checkDemoDailyBudget } from '@/core/rate-limit';
 import { loadSettings } from '@/modules/settings';
 import { MAX_AUDIO_BYTES, transcribeAudio } from '@/modules/transcription';
 
@@ -22,10 +21,6 @@ export async function POST(req: NextRequest) {
 
     const { openaiKey } = await loadSettings(req);
     const customApiKey = req.headers.get('x-openai-key') || openaiKey;
-    if (caller.isGuest && !customApiKey && !(await checkDemoDailyBudget())) {
-      return NextResponse.json({ error: 'The demo has reached its daily AI limit. Please try again tomorrow or sign in.' }, { status: 429 });
-    }
-
     const text = await transcribeAudio({
       audio: Buffer.from(await audioFile.arrayBuffer()),
       fileName: audioFile.name || 'voicenote.webm',
