@@ -32,7 +32,7 @@ Verified on staging, not yet in production.
 - Demo and guest mode. Everyone signs in with Google.
 - Retired AI models.
 
-## [0.1.0] - 2026-08-02
+## [0.1.0] - 2026-08-05
 
 First public version.
 
@@ -42,3 +42,6 @@ First public version.
 - **Sync** to Google Sheets, Notion and Google Drive.
 - **Bring your own key:** user keys encrypted with AES-256-GCM.
 - **Installable mobile web app** (PWA).
+
+[Unreleased]: https://github.com/shoubhiksaha/Doc-Sync-AI/compare/v0.1.0...staging
+[0.1.0]: https://github.com/shoubhiksaha/Doc-Sync-AI/releases/tag/v0.1.0
