@@ -1,4 +1,5 @@
 import { parseNumber } from '@/core/text';
+import { rupees } from './checks';
 import { fieldValue } from './fields';
 import type { DocumentProfile } from './types';
 
@@ -11,6 +12,7 @@ export const ngoReceipt: DocumentProfile = {
   title: 'NGO Donation Receipts',
   documentName: 'NGO Donation Receipt',
   description: 'Extract donor details, amount, PAN, and date from handwritten trust receipts.',
+  group: 'community',
   sheetTab: 'NGO_Receipts',
   sheetTitle: 'DocSync — NGO Receipts',
   sampleDocument: { href: '/sample-ngo-receipt.png', fileName: 'Sample_NGO_Receipt.png' },
@@ -26,15 +28,17 @@ export const ngoReceipt: DocumentProfile = {
     context: 'This is an Indian NGO donation receipt. Typical fields: receipt number, date, donor name, donor address, amount, payment mode, donor PAN, NGO name and 80G registration reference.',
     priorityFields: ['Date', 'Donor Name', 'Amount', 'PAN Number', 'Receipt Number'],
   },
+  // The values on public/sample-ngo-receipt.png, so "Try a sample" without an AI key shows what's on it.
   mockFields: [
-    { key: 'date', label: 'Date', value: '24-Oct-2023', confidence: 95, category: 'date' },
-    { key: 'receiptNumber', label: 'Receipt Number', value: 'REC-2023-4521', confidence: 88, category: 'identity' },
-    { key: 'donorName', label: 'Donor Name', value: 'Rahul Sharma', confidence: 97, category: 'identity' },
+    { key: 'date', label: 'Date', value: '15/07/2026', confidence: 95, category: 'date' },
+    { key: 'receiptNumber', label: 'Receipt Number', value: 'HHF/26-27/0458', confidence: 88, category: 'identity' },
+    { key: 'donorName', label: 'Donor Name', value: 'Arjun Mehta', confidence: 97, category: 'identity' },
+    { key: 'donorAddress', label: 'Donor Address', value: 'Flat 402, Shivam Apts, Pune-411038', confidence: 86, category: 'contact' },
     { key: 'amount', label: 'Amount', value: '₹5,000', confidence: 99, category: 'financial' },
-    { key: 'paymentMode', label: 'Payment Mode', value: 'Cheque', confidence: 85, category: 'financial' },
+    { key: 'paymentMode', label: 'Payment Mode', value: 'Cash', confidence: 93, category: 'financial' },
     { key: 'panNumber', label: 'PAN Number', value: 'ABCDE1234F', confidence: 91, category: 'identity' },
-    { key: 'ngoName', label: 'NGO Name', value: 'Help India Foundation', confidence: 96, category: 'identity' },
-    { key: 'section80g', label: 'Section 80G Ref', value: 'AAACH2345K/2023-24', confidence: 72, category: 'metadata' },
+    { key: 'ngoName', label: 'NGO Name', value: 'Helping Hands Foundation', confidence: 96, category: 'identity' },
+    { key: 'ngoRegistrationNumber', label: 'NGO Reg. No.', value: '12345/2020', confidence: 84, category: 'metadata' },
   ],
   notion: {
     titleFrom: ['donorName', 'donor', 'name'],
@@ -53,7 +57,7 @@ export const ngoReceipt: DocumentProfile = {
       warnings.push(`PAN "${pan}" doesn't match the format ABCDE1234F. Please check it.`);
     }
     if (amount !== null && amount > 2000 && !pan) {
-      warnings.push(`Compliance: donations above ₹2,000 normally need the donor's PAN (₹${amount.toLocaleString('en-IN')} recorded, no PAN).`);
+      warnings.push(`Compliance: donations above ₹2,000 normally need the donor's PAN (${rupees(amount)} recorded, no PAN).`);
     }
     return warnings;
   },

@@ -9,6 +9,10 @@ export interface RecordField {
   category?: FieldCategory | string;
 }
 
+/** Home-page section a profile is listed under. */
+export const PROFILE_GROUPS = ['shops', 'farm', 'transport', 'industry', 'crafts', 'community'] as const;
+export type ProfileGroup = (typeof PROFILE_GROUPS)[number];
+
 export type NotionPropertyType = 'number' | 'rich_text' | 'date' | 'select';
 
 export interface NotionPropertySpec {
@@ -31,6 +35,8 @@ export interface DocumentProfile {
   /** Singular name shown while scanning, e.g. "NGO Donation Receipt". */
   documentName: string;
   description: string;
+  /** Home-page section. */
+  group: ProfileGroup;
   /** Google Sheets tab that receives this profile's rows. */
   sheetTab: string;
   /** Title for a newly created spreadsheet. */

@@ -8,8 +8,9 @@ import { ngoReceipt } from './ngo-receipt';
 import type { ComingSoonProfile, DocumentProfile, Lang, LocalizedProfileText, RecordField } from './types';
 
 export type {
-  ComingSoonProfile, DocumentProfile, FieldCategory, Lang, LocalizedProfileText, NotionPropertySpec, NotionPropertyType, RecordField,
+  ComingSoonProfile, DocumentProfile, FieldCategory, Lang, LocalizedProfileText, NotionPropertySpec, NotionPropertyType, ProfileGroup, RecordField,
 } from './types';
+export { PROFILE_GROUPS } from './types';
 export { comingSoonProfiles } from './catalog';
 export { fieldValue, findField } from './fields';
 
