@@ -1,17 +1,25 @@
-import Link from 'next/link';
-import { ArrowRight, FileText, Receipt, Scale, type LucideIcon } from 'lucide-react';
-import { activeProfiles, comingSoonProfiles, localizedComingSoon, localizedProfile } from '@/modules/profiles';
+import { PROFILE_GROUPS, activeProfiles, comingSoonProfiles, localizedComingSoon, localizedProfile } from '@/modules/profiles';
 import { serverI18n } from '@/client/i18n/server';
-import { buttonClass } from './components/ui';
+import AppPicker, { type PickerApp, type PickerGroup } from './components/AppPicker';
 import RecentScans from './components/RecentScans';
 import styles from './home.module.css';
 
-// Purely visual; a profile without an entry gets the generic document icon.
-const PROFILE_ICONS: Record<string, LucideIcon> = { 'ngo-receipt': Receipt, 'factory-weight-slip': Scale };
-
 export default async function Home() {
   const { lang, t } = await serverI18n();
-  const profiles = activeProfiles().map(p => ({ id: p.id, ...localizedProfile(p, lang) }));
+  const profiles = activeProfiles();
+
+  const apps: PickerApp[] = profiles.map(p => {
+    const shown = localizedProfile(p, lang);
+    // Search both languages, whichever the UI is in: people type "LR" or "दूध" either way.
+    const searchText = (['en', 'hi'] as const)
+      .map(l => localizedProfile(p, l))
+      .flatMap(text => [text.title, text.documentName, text.description])
+      .join(' ')
+      .toLowerCase();
+    return { id: p.id, group: p.group, title: shown.title, description: shown.description, searchText };
+  });
+  const groups: PickerGroup[] = PROFILE_GROUPS.map(id => ({ id, label: t(`group.${id}`) }));
+  const profileNames = Object.fromEntries(profiles.map(p => [p.id, localizedProfile(p, lang).documentName]));
   const comingSoon = comingSoonProfiles.map(p => localizedComingSoon(p, lang));
 
   return (
@@ -21,35 +29,18 @@ export default async function Home() {
         <p className={styles.subtitle}>{t('home.subtitle')}</p>
       </div>
 
-      <ul className={styles.profiles}>
-        {profiles.map(profile => {
-          const Icon = PROFILE_ICONS[profile.id] ?? FileText;
-          return (
-            <li key={profile.id}>
-              <Link href={`/scan/${profile.id}`} className={styles.profileCard}>
-                <span className={styles.profileIcon} aria-hidden><Icon size={28} /></span>
-                <span className={styles.profileText}>
-                  <span className={styles.profileTitle}>{profile.title}</span>
-                  <span className={styles.profileDescription}>{profile.description}</span>
-                </span>
-                <span className={buttonClass({ variant: 'primary', className: styles.profileCta })} aria-hidden>
-                  {t('home.scan')}
-                  <ArrowRight size={18} />
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <RecentScans profileNames={profileNames} />
 
-      <RecentScans profileNames={Object.fromEntries(profiles.map(p => [p.id, p.documentName]))} />
+      <AppPicker apps={apps} groups={groups} />
 
-      <details className={styles.comingSoon}>
-        <summary>{t('home.comingSoon', { count: comingSoon.length })}</summary>
-        <ul className={styles.chips}>
-          {comingSoon.map(item => <li key={item.title} title={item.description}>{item.title}</li>)}
-        </ul>
-      </details>
+      {comingSoon.length > 0 && (
+        <details className={styles.comingSoon}>
+          <summary>{t('home.comingSoon', { count: comingSoon.length })}</summary>
+          <ul className={styles.chips}>
+            {comingSoon.map(item => <li key={item.title} title={item.description}>{item.title}</li>)}
+          </ul>
+        </details>
+      )}
 
       <p className={styles.footer}>{t('home.footer')}</p>
     </main>
