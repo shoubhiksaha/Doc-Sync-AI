@@ -64,7 +64,7 @@ middleware.ts         Auth gate (Google session required), rate limits on every 
 | Profiles | `deriveFields()` / `validateFields()` catch profile bugs | A broken weight-slip validator shows a warning; NGO receipts are untouched |
 | UI | Route `error.tsx` boundaries + `<ModuleBoundary>` around panels | The voice-note panel crashing hides only that panel |
 | Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings) | During a Notion incident, set `MODULE_NOTION=off` in Vercel and redeploy the same build — no code change |
-| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state | Post-deploy contract tests and uptime checks read it |
+| Visibility | `GET /api/health` reports each module's enabled/configured/circuit state; `settings.persistence` is `ok`, `unreachable` (credentials set but Firestore doesn't answer, e.g. API disabled or database missing; reported as `degraded`) or `not_configured`. Firestore is probed with one small read at most once a minute, and a failing Firestore is skipped and logged once a minute, not on every request. No internal error text is ever in the response | Post-deploy contract tests and uptime checks read it |
 
 ### The sync flow
 
@@ -104,7 +104,7 @@ saved preference, else the profile's `duplicateKey` (`''` saved by the user turn
 | Route | Contract |
 |---|---|
 | `POST /api/extract-freeform` | 1–4 `document` entries = pages of one document (images; the client renders PDFs). All pages go to the model in one request. Errors return `{ error, code }` with `code` ∈ `bad_input`, `too_large`, `quota`, `unavailable`, `internal`; messages are plain language, provider details stay in server logs. |
-| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent`, `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`. Saved keys never leave the server. |
+| `GET /api/settings` | `hasOpenAiKey`, `hasNotionKey`, `hasNotionDbId`, `uploadDest`, `isPersistent` (chosen *and* Firestore is answering), `syncAvailable` (Firestore is answering; the Settings page disables the choice otherwise), `aiKeyHint` (masked, e.g. `gsk_…a1b2`), `aiProvider`. Saved keys never leave the server. |
 | `POST /api/settings` | Partial update: only fields present change; `''` removes a value. Persistent mode changes only when `persistent` is sent. |
 | `GET/POST /api/profile-prefs` | Per-profile `fields` (remembered field list, `null` = review every scan) and `primaryKey` (`null` = profile default, `''` = no duplicate check), plus `defaultPrimaryKey`. Stored in the encrypted `docsync_prefs` cookie and, in persistent mode, in Firestore `users/{email}.profilePrefs`. |
 | `POST /api/telemetry` | `{ event, props }` or `{ events: [...] }` (≤ 20). Unknown events/props are dropped, strings capped, emails and 6+ digit runs scrubbed; each event becomes one `{"type":"telemetry",…}` log line with the caller kind only. Own rate-limit group. Returns 204. |
@@ -134,6 +134,13 @@ The UI follows the same idea: small parts with clear contracts.
   layout checks on desktop and phone viewports in CI.
 - **Language:** English and Hindi (`docsync_lang` cookie, toggle in the navbar). `hi.ts` is typed
   against `en.ts`, and a unit test checks every placeholder matches.
+- **Brand:** DocSync AI is an offering by ADT (Analog Digital Technologies). The tokens use ADT's
+  palette (Signal Aqua `#01F9C9`, Deep Black `#0A0A0A`) and type (Space Grotesk headings, IBM Plex
+  Sans text). On light surfaces aqua is only a fill under black text; aqua text, thin borders and
+  focus rings use `--accent-text` (`#00735C`). "An offering by ADT" (`app/components/AdtEndorsement.tsx`)
+  is stacked under the sign-in card and one line at the bottom of every other page and
+  `offline.html`, and links to analogdigital.tech. The SVGs in `public/brand/` come unchanged from
+  ADT's brand kit (`ADT Papers/brand/logo/final/endorsement`); replace them from there, never edit them.
 
 ## Changing things independently
 
@@ -144,7 +151,8 @@ The UI follows the same idea: small parts with clear contracts.
   `GEMINI_VISION_MODEL`, `GROQ_VISION_MODEL`, `ANTHROPIC_VISION_MODEL` per environment.
 - **Change how Sheets lays out rows:** `modules/sheets/a1.ts` (pure functions, fully unit-tested).
 - **Change copy or add a language:** `client/i18n/` (add a dictionary typed `Record<MessageKey, string>`).
-- **Change the look:** tokens in `app/globals.css`, components in `app/components/ui/`.
+- **Change the look:** tokens in `app/globals.css` (ADT's palette; see Brand above), components in
+  `app/components/ui/`.
 - **Add a destination:** create `modules/<name>/` with an `index.ts` and a `<name>Health()`, add it
   to the orchestrator in `modules/sync` behind `runIsolated()`, and to `/api/health`.
 

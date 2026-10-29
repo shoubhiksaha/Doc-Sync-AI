@@ -8,6 +8,8 @@ DocSync AI is a full-stack, mobile-first web app (PWA) designed to eliminate man
 
 **Track 6: AI Agents for Bharat's Businesses**
 
+DocSync AI is an offering by [ADT (Analog Digital Technologies)](https://analogdigital.tech) and uses ADT's colours, type and "An offering by ADT" badge (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#ui)).
+
 ## Prerequisites
 * **Google OAuth client (required):** Everyone signs in with Google. Each user gets their own private spreadsheet and Drive folder, and can bring their own Gemini / Groq / OpenAI / Anthropic key.
 * **AI keys (server):** At least one provider key, unless every user brings their own. With none at all, extraction returns sample data, which is handy for local development.

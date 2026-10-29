@@ -24,6 +24,8 @@ export const hi: Record<MessageKey, string> = {
   'nav.switchLanguageLabel': 'अंग्रेज़ी में बदलें',
   'nav.account': 'आपका खाता',
 
+  'brand.offering': 'ADT (एनालॉग डिजिटल टेक्नोलॉजीज़) की पेशकश। analogdigital.tech नए टैब में खुलेगा',
+
   'login.tagline': 'काग़ज़ की रसीदों और पर्चियों की फ़ोटो लें। DocSync उन्हें पढ़कर आपकी Google शीट में एक पंक्ति जोड़ देता है।',
   'login.google': 'Google से साइन इन करें',
   'login.where': 'पंक्तियाँ आपकी अपनी Google Drive की निजी शीट में जाती हैं, फ़ोटो और वॉइस नोट के साथ।',
@@ -207,6 +209,7 @@ export const hi: Record<MessageKey, string> = {
   'settings.sync.title': 'मेरी सेटिंग्स मेरे सभी डिवाइस पर इस्तेमाल करें',
   'settings.sync.on': 'आपकी AI key और पसंद आपके खाते में एन्क्रिप्ट होकर रखी जाती हैं और जिस भी डिवाइस पर आप साइन इन करें, वहाँ मिलती हैं।',
   'settings.sync.off': 'आपकी AI key और पसंद सिर्फ़ इसी डिवाइस पर, एक एन्क्रिप्टेड कुकी में रहती हैं।',
+  'settings.sync.unavailable': 'सेटिंग्स को दूसरे डिवाइस पर इस्तेमाल करना अभी उपलब्ध नहीं है। आपकी AI key और पसंद इसी डिवाइस पर, एक एन्क्रिप्टेड कुकी में रखी जाती हैं।',
   'settings.profiles.title': 'याद रखे गए फ़ील्ड',
   'settings.profiles.body': 'हर तरह के दस्तावेज़ के लिए DocSync जो फ़ील्ड खुद भरता है।',
   'settings.profiles.none': 'अभी कुछ याद नहीं रखा गया',

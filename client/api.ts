@@ -154,7 +154,10 @@ export interface SettingsStatus {
   hasNotionKey: boolean;
   hasNotionDbId: boolean;
   uploadDest: UploadDest;
+  /** Cross-device settings are on and actually being kept. */
   isPersistent: boolean;
+  /** Cross-device settings work right now; when false the choice is shown but can't be changed. */
+  syncAvailable: boolean;
 }
 
 export async function fetchSettings(): Promise<SettingsStatus> {

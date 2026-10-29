@@ -1,26 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { signIn } from '../support/session';
+import { SAVED } from '../support/stubs';
 
 // UX gate, run on a desktop and a phone viewport (see playwright.config.ts). It walks the main
 // flow in mock mode and fails on serious/critical WCAG 2.2 AA violations, an off-screen primary
 // action, clipped field values, horizontal scrolling, or dialogs that don't open on top / close.
 // The save is answered by a stub, so the run never touches a Google account.
-
-const SAVED = {
-  success: true,
-  partial: false,
-  message: 'Successfully synced to all destinations',
-  errors: [],
-  warnings: [],
-  destinations: {
-    sheets: { status: 'success', code: 'saved' },
-    notion: { status: 'skipped', code: 'not_connected' },
-    media: { status: 'success', code: 'saved' },
-  },
-  spreadsheetId: 'e2e-sheet',
-  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/e2e-sheet/edit',
-};
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 

@@ -35,7 +35,9 @@ const config: Config = {
     },
   },
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
-  testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/scratch/'],
+  // .claude/ holds Claude Code's temporary worktrees (full copies of the repo).
+  testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/scratch/', '/\\.claude/'],
+  modulePathIgnorePatterns: ['/\\.claude/'],
   coverageReporters: ['text', 'lcov', 'html'],
 };
 

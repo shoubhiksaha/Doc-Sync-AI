@@ -220,13 +220,13 @@ export default function SettingsClient({ profiles, notionJustConnected }: Settin
                 <input
                   type="checkbox"
                   checked={settings.isPersistent}
-                  disabled={busy === 'sync'}
+                  disabled={busy === 'sync' || !settings.syncAvailable}
                   onChange={e => update('sync', { persistent: e.target.checked })}
                 />
                 <span>
                   <span className={styles.optionLabel}>{t('settings.sync.title')}</span>
                   <span className={styles.hint}>
-                    {settings.isPersistent ? t('settings.sync.on') : t('settings.sync.off')}
+                    {!settings.syncAvailable ? t('settings.sync.unavailable') : settings.isPersistent ? t('settings.sync.on') : t('settings.sync.off')}
                   </span>
                 </span>
               </label>

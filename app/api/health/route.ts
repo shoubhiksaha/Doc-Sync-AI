@@ -12,25 +12,30 @@ export const dynamic = 'force-dynamic';
 
 type ModuleHealth = { enabled: boolean; configured: boolean; circuit: 'closed' | 'open' };
 
-/** Each probe is isolated: a module whose health check throws is reported as unhealthy, not a 500. */
-function probe(fn: () => ModuleHealth): ModuleHealth & { error?: string } {
+/**
+ * Each probe is isolated: a module whose health check throws is reported as unhealthy, not a 500.
+ * This endpoint is public, so the error itself goes to the server log, never into the response.
+ */
+async function probe<T extends ModuleHealth>(name: string, fn: () => T | Promise<T>): Promise<T | (ModuleHealth & { error: string })> {
   try {
-    return fn();
+    return await fn();
   } catch (err) {
-    return { enabled: false, configured: false, circuit: 'open', error: err instanceof Error ? err.message : String(err) };
+    console.error(`[health] ${name} check failed:`, err instanceof Error ? err.message : err);
+    return { enabled: false, configured: false, circuit: 'open', error: 'health check failed' };
   }
 }
 
 export async function GET() {
-  const modules = {
-    ai: probe(aiHealth),
-    extraction: probe(extractionHealth),
-    transcription: probe(transcriptionHealth),
-    sheets: probe(sheetsHealth),
-    notion: probe(notionHealth),
-    media: probe(mediaHealth),
-    settings: probe(settingsHealth),
-  };
+  const [ai, extraction, transcription, sheets, notion, media, settings] = await Promise.all([
+    probe('ai', aiHealth),
+    probe('extraction', extractionHealth),
+    probe('transcription', transcriptionHealth),
+    probe('sheets', sheetsHealth),
+    probe('notion', notionHealth),
+    probe('media', mediaHealth),
+    probe('settings', settingsHealth),
+  ]);
+  const modules = { ai, extraction, transcription, sheets, notion, media, settings };
   const degraded = Object.values(modules).some(m => m.enabled && m.circuit === 'open') || !modules.settings.configured;
 
   return NextResponse.json(

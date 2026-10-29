@@ -4,9 +4,12 @@ jest.mock('next-auth/jwt', () => ({ getToken: (...a: unknown[]) => getToken(...a
 const docRef = { get: jest.fn(), set: jest.fn(), delete: jest.fn() };
 const db = { collection: jest.fn(() => ({ doc: jest.fn(() => docRef) })) };
 let dbAvailable = true;
+let firestore: 'ok' | 'unreachable' = 'ok';
+const reportFirestore = jest.fn();
 jest.mock('@/modules/settings/firestore', () => ({
-  getDb: () => (dbAvailable ? db : null),
-  firestoreConfigured: () => dbAvailable,
+  firestoreForRequest: () => (dbAvailable ? db : null),
+  firestoreState: async () => (dbAvailable ? firestore : 'not_configured'),
+  reportFirestore: (...a: unknown[]) => reportFirestore(...a),
 }));
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,6 +33,7 @@ describe('modules/settings', () => {
     docRef.delete.mockReset().mockResolvedValue(undefined);
     process.env = { ...saved, ENCRYPTION_KEY: 'c'.repeat(64) };
     dbAvailable = true;
+    firestore = 'ok';
     getToken.mockResolvedValue({ email: 'u@example.com' });
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -50,6 +54,7 @@ describe('modules/settings', () => {
   it('degrades to cookie-only settings when Firestore fails or holds bad data', async () => {
     docRef.get.mockRejectedValue(new Error('firestore down'));
     await expect(loadSettings(req())).resolves.toMatchObject({ uploadDest: 'both' });
+    expect(reportFirestore).toHaveBeenLastCalledWith(false, expect.any(Error));
     docRef.get.mockResolvedValue({ exists: true, data: () => ({ openaiKey: { junk: true } }) });
     await expect(loadSettings(req())).resolves.toMatchObject({ openaiKey: undefined });
     dbAvailable = false;
@@ -84,7 +89,7 @@ describe('modules/settings', () => {
     docRef.get.mockResolvedValue({ exists: true, data: () => ({ notionKey: {}, uploadDest: 'gdrive' }) });
     const status = await settingsStatus(req({ docsync_openai: encrypt('gsk_abcdefghijklmnop1234') }), { classifyKey: k => (k.startsWith('gsk_') ? 'groq' : 'other') });
     expect(status).toEqual({
-      hasOpenAiKey: true, hasNotionKey: true, hasNotionDbId: false, uploadDest: 'gdrive', isPersistent: true,
+      hasOpenAiKey: true, hasNotionKey: true, hasNotionDbId: false, uploadDest: 'gdrive', isPersistent: true, syncAvailable: true,
       aiKeyHint: 'gsk_…1234', aiProvider: 'groq',
     });
     expect(JSON.stringify(status)).not.toContain('abcdefghijklmnop');
@@ -97,13 +102,26 @@ describe('modules/settings', () => {
 
     dbAvailable = false;
     await expect(settingsStatus(req({ docsync_openai: 'garbage', docsync_persistent: 'true' }))).resolves.toMatchObject({
-      hasOpenAiKey: false, aiKeyHint: null, aiProvider: null, isPersistent: true,
+      hasOpenAiKey: false, aiKeyHint: null, aiProvider: null, isPersistent: false, syncAvailable: false,
     });
   });
 
-  it('settingsStatus tolerates a Firestore outage', async () => {
+  it('settingsStatus tolerates a Firestore outage and stops claiming cross-device sync', async () => {
     docRef.get.mockRejectedValue(new Error('down'));
-    await expect(settingsStatus(req())).resolves.toMatchObject({ hasOpenAiKey: false, aiKeyHint: null });
+    await expect(settingsStatus(req({ docsync_persistent: 'true' }))).resolves.toMatchObject({
+      hasOpenAiKey: false, aiKeyHint: null, isPersistent: false, syncAvailable: false,
+    });
+    expect(reportFirestore).toHaveBeenLastCalledWith(false, expect.any(Error));
+  });
+
+  it('settingsStatus: persistence chosen on this device counts only while Firestore answers', async () => {
+    docRef.get.mockResolvedValue({ exists: false });
+    await expect(settingsStatus(req({ docsync_persistent: 'true' }))).resolves.toMatchObject({ isPersistent: true, syncAvailable: true });
+
+    firestore = 'unreachable';
+    jest.clearAllMocks();
+    await expect(settingsStatus(req({ docsync_persistent: 'true' }))).resolves.toMatchObject({ isPersistent: false, syncAvailable: false });
+    expect(docRef.get).not.toHaveBeenCalled();
   });
 
   it('maskKey never shows more than the edges of a key', () => {
@@ -206,6 +224,15 @@ describe('modules/settings', () => {
   it('parseUploadDest and health', () => {
     expect(parseUploadDest('notion')).toBe('notion');
     expect(parseUploadDest(undefined)).toBe('both');
-    expect(settingsHealth()).toMatchObject({ enabled: true, configured: true, persistent: true });
+  });
+
+  it('health reports whether cross-device settings actually work', async () => {
+    await expect(settingsHealth()).resolves.toMatchObject({ enabled: true, configured: true, persistent: true, persistence: 'ok', circuit: 'closed' });
+    firestore = 'unreachable';
+    await expect(settingsHealth()).resolves.toMatchObject({ persistent: false, persistence: 'unreachable', circuit: 'open' });
+    dbAvailable = false;
+    await expect(settingsHealth()).resolves.toMatchObject({ persistent: false, persistence: 'not_configured', circuit: 'closed' });
+    process.env.MODULE_SETTINGS = 'off';
+    await expect(settingsHealth()).resolves.toMatchObject({ enabled: false, persistence: 'not_configured' });
   });
 });

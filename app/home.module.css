@@ -41,7 +41,7 @@
 }
 
 .profileCard:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   box-shadow: var(--shadow-md);
 }
 

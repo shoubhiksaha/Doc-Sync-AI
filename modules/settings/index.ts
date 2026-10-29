@@ -4,6 +4,7 @@
  * Stateless mode: values live in encrypted httpOnly cookies. Persistent mode: values are also
  * stored in Firestore with envelope encryption so they follow the user across devices.
  * Every failure here degrades to "no saved settings"; callers then fall back to server keys.
+ * A Firestore that fails is skipped for a minute (see ./firestore), so it costs one log line, not one per request.
  * Saved keys never leave the server: status calls return a masked hint only.
  */
 import type { NextRequest, NextResponse } from 'next/server';
@@ -12,7 +13,7 @@ import { isModuleEnabled } from '@/core/env';
 import { encrypt, getDecryptedCookie, isEncryptionConfigured } from '@/core/crypto';
 import { generateAndWrapDEK, unwrapAndDecryptDEK, type KmsPayload } from '@/core/envelope';
 import { getProfile } from '@/modules/profiles';
-import { firestoreConfigured, getDb } from './firestore';
+import { firestoreForRequest, firestoreState, reportFirestore, type FirestoreState } from './firestore';
 
 export type UploadDest = 'both' | 'gdrive' | 'notion';
 
@@ -78,12 +79,13 @@ export async function loadSettings(req: NextRequest): Promise<DocSyncSettings> {
   };
   if (!isModuleEnabled('settings') || (settings.openaiKey && settings.notionKey && settings.notionDbId)) return settings;
 
-  const db = getDb();
+  const db = firestoreForRequest();
   const email = db ? await userEmail(req) : undefined;
   if (!db || !email) return settings;
 
   try {
     const doc = await db.collection('users').doc(email).get();
+    reportFirestore(true);
     const data = doc.exists ? doc.data() : undefined;
     if (data) {
       settings.openaiKey ??= safeUnwrap(data.openaiKey);
@@ -92,7 +94,7 @@ export async function loadSettings(req: NextRequest): Promise<DocSyncSettings> {
       if (data.uploadDest) settings.uploadDest = parseUploadDest(data.uploadDest);
     }
   } catch (err) {
-    console.error('[settings] Firestore read failed; using cookie settings only:', err instanceof Error ? err.message : err);
+    reportFirestore(false, err); // cookie settings only
   }
   return settings;
 }
@@ -122,14 +124,15 @@ export async function saveSettings(req: NextRequest, response: NextResponse, upd
   }
   const persistent = update.persistent ?? persistentCookie(req);
 
-  const db = getDb();
-  const email = db && isModuleEnabled('settings') ? await userEmail(req) : undefined;
+  const db = isModuleEnabled('settings') ? firestoreForRequest() : null;
+  const email = db ? await userEmail(req) : undefined;
   if (!db || !email) return { persisted: false };
 
   try {
     const ref = db.collection('users').doc(email);
     if (update.persistent === false) {
       await ref.delete();
+      reportFirestore(true);
       return { persisted: false };
     }
     if (!persistent) return { persisted: false };
@@ -143,10 +146,13 @@ export async function saveSettings(req: NextRequest, response: NextResponse, upd
     wrap('notionKey', update.notionKey);
     wrap('notionDbId', update.notionDbId);
     if (update.uploadDest) data.uploadDest = parseUploadDest(update.uploadDest);
-    if (Object.keys(data).length) await ref.set(data, { merge: true });
+    if (Object.keys(data).length) {
+      await ref.set(data, { merge: true });
+      reportFirestore(true);
+    }
     return { persisted: true };
   } catch (err) {
-    console.error('[settings] Firestore write failed; cookies were still saved:', err instanceof Error ? err.message : err);
+    reportFirestore(false, err); // the cookies were still saved
     return { persisted: 'failed' };
   }
 }
@@ -156,7 +162,10 @@ export interface SettingsStatus {
   hasNotionKey: boolean;
   hasNotionDbId: boolean;
   uploadDest: UploadDest;
+  /** The user chose cross-device settings and Firestore is actually keeping them. */
   isPersistent: boolean;
+  /** Cross-device settings work right now: Firestore is configured and answering. */
+  syncAvailable: boolean;
   /** Masked saved AI key, e.g. "gsk_…a1b2"; null when none is saved. */
   aiKeyHint: string | null;
   /** Result of `classifyKey` on the saved AI key (e.g. its provider); null without a key or classifier. */
@@ -174,20 +183,25 @@ export async function settingsStatus(req: NextRequest, opts: { classifyKey?: (ke
     hasNotionKey: Boolean(getDecryptedCookie(req, SETTINGS_COOKIES.notionKey)),
     hasNotionDbId: Boolean(getDecryptedCookie(req, SETTINGS_COOKIES.notionDbId)),
     uploadDest: parseUploadDest(req.cookies.get(SETTINGS_COOKIES.uploadDest)?.value),
-    isPersistent: persistentCookie(req),
+    isPersistent: false,
+    syncAvailable: false,
     aiKeyHint: null,
     aiProvider: null,
   };
+  const persistence: FirestoreState = isModuleEnabled('settings') ? await firestoreState() : 'not_configured';
+  let syncAvailable = persistence === 'ok';
+  let chosen = persistentCookie(req);
 
-  if (!(status.hasOpenAiKey && status.hasNotionKey && status.hasNotionDbId)) {
-    const db = getDb();
+  if (syncAvailable && !(status.hasOpenAiKey && status.hasNotionKey && status.hasNotionDbId)) {
+    const db = firestoreForRequest();
     const email = db ? await userEmail(req) : undefined;
     if (db && email) {
       try {
         const doc = await db.collection('users').doc(email).get();
+        reportFirestore(true);
         const data = doc.exists ? doc.data() : undefined;
         if (data) {
-          status.isPersistent = true;
+          chosen = true;
           aiKey ??= safeUnwrap(data.openaiKey);
           status.hasOpenAiKey ||= Boolean(aiKey);
           status.hasNotionKey ||= Boolean(data.notionKey);
@@ -195,10 +209,14 @@ export async function settingsStatus(req: NextRequest, opts: { classifyKey?: (ke
           if (data.uploadDest) status.uploadDest = parseUploadDest(data.uploadDest);
         }
       } catch (err) {
-        console.error('[settings] Firestore status read failed:', err instanceof Error ? err.message : err);
+        reportFirestore(false, err);
+        syncAvailable = false;
       }
     }
   }
+  // Never claim "on all your devices" while nothing is reaching Firestore.
+  status.syncAvailable = syncAvailable;
+  status.isPersistent = syncAvailable && chosen;
 
   if (aiKey) {
     status.aiKeyHint = maskKey(aiKey);
@@ -294,15 +312,16 @@ export async function loadProfilePrefs(req: NextRequest, profileId: string): Pro
   const fromCookie = readPrefsCookie(req)[profileId];
   if (fromCookie) return fromCookie;
 
-  const db = isModuleEnabled('settings') ? getDb() : null;
+  const db = isModuleEnabled('settings') ? firestoreForRequest() : null;
   const email = db ? await userEmail(req) : undefined;
   if (db && email) {
     try {
       const doc = await db.collection('users').doc(email).get();
+      reportFirestore(true);
       const stored = doc.exists ? (doc.data()?.profilePrefs as Record<string, unknown> | undefined)?.[profileId] : undefined;
       if (stored) return sanitizePrefs(stored);
     } catch (err) {
-      console.error('[settings] Firestore prefs read failed:', err instanceof Error ? err.message : err);
+      reportFirestore(false, err);
     }
   }
   return { ...DEFAULT_PREFS, primaryKey: legacyPrimaryKey(req, profileId) };
@@ -327,23 +346,32 @@ export async function saveProfilePrefs(
   // The prefs cookie replaces the legacy per-profile primary-key cookie.
   response.cookies.delete(`docsync_pk_${profileId.replace(/-/g, '_')}`);
 
-  const db = persistentCookie(req) && isModuleEnabled('settings') ? getDb() : null;
+  const db = persistentCookie(req) && isModuleEnabled('settings') ? firestoreForRequest() : null;
   const email = db ? await userEmail(req) : undefined;
   if (db && email) {
     try {
       await db.collection('users').doc(email).set({ profilePrefs: { [profileId]: next } }, { merge: true });
+      reportFirestore(true);
     } catch (err) {
-      console.error('[settings] Firestore prefs write failed; saved on this device only:', err instanceof Error ? err.message : err);
+      reportFirestore(false, err); // saved on this device only
     }
   }
   return next;
 }
 
-export function settingsHealth() {
+/**
+ * `persistence` is whether cross-device settings work: 'ok', 'unreachable' (credentials are set but
+ * Firestore doesn't answer: API disabled, database missing, network) or 'not_configured'
+ * (cookie-only by design). Unreachable opens the circuit, so /api/health reports "degraded".
+ */
+export async function settingsHealth() {
+  const enabled = isModuleEnabled('settings');
+  const persistence: FirestoreState = enabled ? await firestoreState() : 'not_configured';
   return {
-    enabled: isModuleEnabled('settings'),
+    enabled,
     configured: isEncryptionConfigured(),
-    persistent: firestoreConfigured(),
-    circuit: 'closed' as const,
+    persistent: persistence === 'ok',
+    persistence,
+    circuit: persistence === 'unreachable' ? 'open' as const : 'closed' as const,
   };
 }

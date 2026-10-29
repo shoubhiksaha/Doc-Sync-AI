@@ -26,6 +26,8 @@ export const en = {
   'nav.switchLanguageLabel': 'Switch to Hindi',
   'nav.account': 'Your account',
 
+  'brand.offering': 'An offering by ADT, Analog Digital Technologies. Opens analogdigital.tech in a new tab',
+
   'login.tagline': 'Photograph paper receipts and slips. DocSync reads them and adds a row to your Google Sheet.',
   'login.google': 'Sign in with Google',
   'login.where': 'Rows go to a private sheet in your own Google Drive, together with the photos and voice notes.',
@@ -209,6 +211,7 @@ export const en = {
   'settings.sync.title': 'Use my settings on all my devices',
   'settings.sync.on': 'Your AI key and preferences are stored encrypted in your account and follow you to any device you sign in on.',
   'settings.sync.off': 'Your AI key and preferences stay on this device only, in an encrypted cookie.',
+  'settings.sync.unavailable': "Using your settings on other devices isn't available right now. Your AI key and preferences are kept on this device, in an encrypted cookie.",
   'settings.profiles.title': 'Remembered fields',
   'settings.profiles.body': 'Fields DocSync fills in for each document type.',
   'settings.profiles.none': 'Nothing remembered yet',

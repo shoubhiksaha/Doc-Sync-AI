@@ -46,12 +46,13 @@ test.describe(`Live environment contract (${expectedEnvironment || 'any'})`, () 
     expect(settings.status()).toBe(401);
   });
 
-  test('3. Login page loads without uncaught exceptions', async ({ page }) => {
+  test('3. Login page loads, with the ADT badge, without uncaught exceptions', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
     await page.goto('/login', { waitUntil: 'load', timeout: 30000 });
     await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('link', { name: /An offering by ADT/ })).toHaveAttribute('href', 'https://analogdigital.tech');
 
     expect(errors.filter((msg) => !msg.includes('net::ERR') && !msg.includes('Failed to fetch'))).toHaveLength(0);
   });

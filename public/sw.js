@@ -1,18 +1,21 @@
 // DocSync AI service worker.
 // Makes the app open offline without ever serving stale code online:
 //   - /_next/static/* files are content-hashed, so they are served cache-first;
-//   - a few public assets (offline page, icons, sample) are precached;
+//   - a few public assets (offline page, icons, ADT badge, sample) are precached;
 //   - page navigations go to the network first and fall back to the last copy (or offline.html);
 //   - /api/* and every other request always go straight to the network.
 // Logout posts { type: 'clear' } so no pages from the previous session stay on the device.
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const STATIC_CACHE = `docsync-static-${VERSION}`;
 const PAGES_CACHE = `docsync-pages-${VERSION}`;
 const CURRENT = [STATIC_CACHE, PAGES_CACHE];
 const MAX_PAGES = 20;
 
-const PRECACHE = ['/offline.html', '/manifest.json', '/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png', '/sample-ngo-receipt.png'];
+const PRECACHE = [
+  '/offline.html', '/manifest.json', '/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png', '/sample-ngo-receipt.png',
+  '/brand/offering-by-adt-inline-light.svg', '/brand/offering-by-adt-inline-dark.svg',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE)));

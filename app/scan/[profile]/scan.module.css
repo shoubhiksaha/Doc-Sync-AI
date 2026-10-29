@@ -35,7 +35,7 @@
 }
 
 .dropzoneActive {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   background: var(--accent-soft);
 }
 
@@ -210,7 +210,7 @@
 }
 
 .pageButton[aria-pressed='true'] {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
 }
 
 .viewer {

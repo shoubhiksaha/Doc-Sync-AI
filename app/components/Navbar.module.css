@@ -20,6 +20,7 @@
   gap: 10px;
   min-height: 44px;
   color: var(--text);
+  font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 700;
   text-decoration: none;
