@@ -5,15 +5,14 @@ describe('core/env', () => {
   const saved = { ...process.env };
   afterEach(() => { process.env = { ...saved }; });
 
-  it('derives the environment from APP_ENV, then VERCEL_ENV', () => {
+  it('reads the environment from APP_ENV, else NODE_ENV', () => {
     process.env.APP_ENV = 'staging';
     expect(appEnvironment()).toBe('staging');
-    delete process.env.APP_ENV;
-    process.env.VERCEL_ENV = 'production';
+    process.env.APP_ENV = 'production';
     expect(appEnvironment()).toBe('production');
-    process.env.VERCEL_ENV = 'preview';
-    expect(appEnvironment()).toBe('staging');
-    delete process.env.VERCEL_ENV;
+    process.env.APP_ENV = 'nonsense';
+    expect(appEnvironment()).toBe('test');
+    delete process.env.APP_ENV;
     expect(appEnvironment()).toBe('test');
   });
 

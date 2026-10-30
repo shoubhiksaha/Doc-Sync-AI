@@ -10,8 +10,6 @@ export function appEnvironment(): AppEnvironment {
   if (explicit === 'production' || explicit === 'staging' || explicit === 'development' || explicit === 'test') {
     return explicit;
   }
-  if (process.env.VERCEL_ENV === 'production') return 'production';
-  if (process.env.VERCEL_ENV === 'preview') return 'staging';
   return process.env.NODE_ENV === 'test' ? 'test' : 'development';
 }
 

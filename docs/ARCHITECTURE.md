@@ -1,6 +1,6 @@
 # Architecture: independent modules, contained failures
 
-DocSync AI is one Next.js app (one Vercel project), split into modules that can each change on
+DocSync AI is one Next.js app (one Cloud Run service per environment), split into modules that can each change on
 their own and fail on their own. The goal is simple: **a problem in one part never takes down the
 rest.** If Notion is down, rows still reach Google Sheets. If transcription breaks, scanning still
 works. If a validator for one document type has a bug, the other document types are unaffected.
@@ -57,13 +57,13 @@ middleware.ts         Auth gate (Google session required), rate limits on every 
 
 | Layer | Mechanism | Example |
 |---|---|---|
-| Deployment | Every API route is its own Vercel serverless function | A crash in `/api/transcribe` can't affect `/api/sync` |
+| Deployment | Stateless Cloud Run instances: an error in a route fails only that request, and an instance that dies is replaced while others keep serving | An exception in `/api/transcribe` returns an error for that call; `/api/sync` keeps working |
 | Import time | No module does work at import (Firestore, crypto keys and Redis are lazy) | A missing `ENCRYPTION_KEY` disables saved settings only; extraction still runs with server keys |
 | Calls between modules | `runIsolated()` gives each call a timeout, kill switch and circuit breaker, and returns an outcome instead of throwing | Notion timing out after 25s is reported as `notion: failed`; the Sheets row is still written |
 | Providers | The ai module tries the next provider after any error; failing server keys are paused for 60s | A retired Groq model or an exhausted OpenAI quota falls through to Gemini |
 | Profiles | `deriveFields()` / `validateFields()` catch profile bugs | A broken weight-slip validator shows a warning; NGO receipts are untouched |
 | UI | Route `error.tsx` boundaries + `<ModuleBoundary>` around panels | The voice-note panel crashing hides only that panel |
-| Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings) | During a Notion incident, set `MODULE_NOTION=off` in Vercel and redeploy the same build — no code change |
+| Operations | `MODULE_<NAME>=off` (ai, extraction, transcription, sheets, notion, media, settings) | During a Notion incident, upload `MODULE_NOTION=off` with `scripts/gcp/push-env.sh` and re-run the deploy — no code change |
 | Visibility | `GET /api/health` reports each module's enabled/configured/circuit state; `settings.persistence` is `ok`, `unreachable` (credentials set but Firestore doesn't answer, e.g. API disabled or database missing; reported as `degraded`) or `not_configured`. Firestore is probed with one small read at most once a minute, and a failing Firestore is skipped and logged once a minute, not on every request. No internal error text is ever in the response | Post-deploy contract tests and uptime checks read it |
 
 ### The sync flow

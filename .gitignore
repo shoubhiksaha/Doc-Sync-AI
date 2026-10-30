@@ -28,9 +28,6 @@ yarn-error.log*
 # local env files
 .env*.local
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -51,3 +48,6 @@ keys/
 /e2e/test-results/
 /playwright-report/
 /test-results/
+
+# wrangler dev local state
+.wrangler/

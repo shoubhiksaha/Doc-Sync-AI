@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { viaTrustedProxy } from '@/core/proxy';
 import { checkRateLimit } from '@/core/rate-limit';
 
 /** API routes reachable without a session. */
@@ -11,6 +12,9 @@ function isPublicApi(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  // On Cloud Run, only requests forwarded by the Cloudflare Worker are served (core/proxy.ts).
+  if (!viaTrustedProxy(request.headers)) return new NextResponse('Not found', { status: 404 });
+
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith('/api/');
 

@@ -25,6 +25,10 @@ export function limitFor(group: RateGroup): number {
   return LIMITS[group];
 }
 
+/**
+ * The caller's IP: x-real-ip, set by the platform or, on Cloud Run, by the Cloudflare Worker
+ * (middleware.ts refuses requests that didn't come through it; see core/proxy.ts).
+ */
 export function clientIp(headers: Headers): string {
   return headers.get('x-real-ip')?.trim()
     || headers.get('x-forwarded-for')?.split(',')[0]?.trim()

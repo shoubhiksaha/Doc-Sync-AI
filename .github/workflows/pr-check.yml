@@ -1,8 +1,8 @@
 name: PR Check
 
 # Runs on every PR into staging or main.
-#   PR → staging : full quality gate; merging deploys the staging environment (Vercel Preview,
-#                  Firestore "staging") after owner approval.
+#   PR → staging : full quality gate; merging deploys the staging environment (Cloud Run
+#                  docsync-staging, Firestore "staging") after owner approval.
 #   PR → main    : full quality gate + "Branch Policy": the head must not be `staging`, must not
 #                  contain staging merges, and every commit must already be on staging.
 on:

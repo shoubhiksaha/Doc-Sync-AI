@@ -3,7 +3,7 @@
  *
  * The browser reports funnel events (scan opened → photo added → extracted → saved) and client
  * errors to /api/telemetry; each accepted event becomes one JSON log line that any log drain
- * (Vercel, Datadog, …) can chart. Only allow-listed event names and props get through, strings
+ * (Cloud Logging, Datadog, …) can chart. Only allow-listed event names and props get through, strings
  * are length-capped, and emails / long digit runs are scrubbed, so no document content, field
  * value or personal identifier is ever logged.
  */

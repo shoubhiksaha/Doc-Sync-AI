@@ -8,7 +8,7 @@ The flow itself is described in [RELEASE_FLOW.md](RELEASE_FLOW.md). This is the 
 - [ ] `npm run check:conflicts`, `npm run check:secrets`
 - [ ] `npm run lint`, `npm run typecheck`, `npm run test:coverage`
 - [ ] `npm run build` then `npm run test:e2e` (smoke suite in mock mode)
-- [ ] New environment variable? Added to Vercel for **both** Preview and Production, and to `.env.example`
+- [ ] New environment variable? Uploaded for **both** environments with `scripts/gcp/push-env.sh`, and added to `.env.example`
 
 ## 2. Staging
 
@@ -26,10 +26,12 @@ The flow itself is described in [RELEASE_FLOW.md](RELEASE_FLOW.md). This is the 
 - [ ] "Branch Policy" passed (every commit already on staging, no staging merges)
 - [ ] Merged with a merge commit and approved the `production` deployment
 - [ ] "Post-Deploy Verification (Production)" passed
-- [ ] Quick check on https://docsync.analogdigital.tech; no new 5xx in Vercel → Logs
+- [ ] Quick check on https://docsync.analogdigital.tech; no new 5xx in Cloud Run → docsync-production → Logs
 
 ## Rollback
 
-1. Vercel → Project → Deployments → previous production deployment → **Instant Rollback** (immediate).
+1. Cloud Run → docsync-production → Revisions → previous revision → **Manage traffic** → 100%
+   (immediate), or `gcloud run services update-traffic docsync-production --region asia-south1 --to-revisions <previous>=100`.
 2. `git revert -m 1 <merge-sha>` on a new branch, then ship it through staging → main as usual.
-3. Never run `vercel deploy --prod` from a laptop; production deploys only from the `Production Deploy` workflow.
+   The next production deploy sends all traffic to the new revision again.
+3. Never run `gcloud run deploy` from a laptop; production deploys only from the `Production Deploy` workflow.

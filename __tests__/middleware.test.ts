@@ -34,6 +34,16 @@ describe('middleware', () => {
     expect(page.headers.get('location')).toBe('http://localhost/login');
   });
 
+  it('with PROXY_SECRET set, serves only requests forwarded by the Cloudflare Worker', async () => {
+    process.env.PROXY_SECRET = 'proxy-secret';
+    const direct = await middleware(request('/api/health'));
+    expect(direct.status).toBe(404);
+    const forged = new NextRequest('http://localhost/login', { headers: { 'x-proxy-secret': 'proxy-secreT' } });
+    expect((await middleware(forged)).status).toBe(404);
+    const viaWorker = new NextRequest('http://localhost/api/health', { headers: { 'x-proxy-secret': 'proxy-secret' } });
+    expect((await middleware(viaWorker)).status).toBe(200);
+  });
+
   it('ignores cookies left over from the removed demo mode', async () => {
     expect((await middleware(request('/api/settings', 'docsync_guest=true'))).status).toBe(401);
     expect((await middleware(request('/api/settings', 'docsync_guest=v1.9999999999.nonce.signature'))).status).toBe(401);
