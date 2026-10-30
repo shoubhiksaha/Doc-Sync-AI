@@ -12,7 +12,7 @@
 # ==============================================================================
 set -euo pipefail
 
-REPO="${REPO:-shoubhiksaha/Doc-Sync-AI}"
+REPO="${REPO:-shoubhiksaha/docsync-ai}"
 OWNER_LOGIN="${OWNER_LOGIN:-shoubhiksaha}"
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
@@ -140,8 +140,8 @@ cat <<'EOF'
 
 Next steps (manual):
   • Create a Vercel token (vercel.com/account/tokens) and store it on BOTH environments:
-        gh secret set VERCEL_TOKEN --env staging    --repo shoubhiksaha/Doc-Sync-AI
-        gh secret set VERCEL_TOKEN --env production --repo shoubhiksaha/Doc-Sync-AI
+        gh secret set VERCEL_TOKEN --env staging    --repo shoubhiksaha/docsync-ai
+        gh secret set VERCEL_TOKEN --env production --repo shoubhiksaha/docsync-ai
   • Set the Vercel project ids as variables on both environments (values are in
     .vercel/project.json after `vercel link`, or Vercel → Project → Settings):
         gh variable set VERCEL_ORG_ID     --env staging --body <team_or_user_id>
