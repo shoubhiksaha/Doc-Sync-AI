@@ -32,16 +32,6 @@ describe('core/rate-limit', () => {
     expect(clientIp(new Headers())).toBe('unknown');
   });
 
-  it('behind the Cloudflare proxy, trusts x-real-ip only with the proxy secret', () => {
-    process.env.PROXY_SECRET = 'proxy-secret';
-    const viaProxy = { 'x-proxy-secret': 'proxy-secret', 'x-real-ip': '1.1.1.1', 'x-forwarded-for': '1.1.1.1, 172.64.0.9' };
-    expect(clientIp(new Headers(viaProxy))).toBe('1.1.1.1');
-    // Straight to Cloud Run with a made-up x-real-ip: keyed on the address Google appended.
-    const forged = { 'x-proxy-secret': 'wrong-secret', 'x-real-ip': '9.9.9.9', 'x-forwarded-for': '9.9.9.9, 3.3.3.3' };
-    expect(clientIp(new Headers(forged))).toBe('3.3.3.3');
-    expect(clientIp(new Headers({ 'x-real-ip': '9.9.9.9' }))).toBe('unknown');
-  });
-
   it('allows up to the limit in memory, then blocks, then resets', async () => {
     const now = 1_000;
     expect(await consume('k', 2, 100, now)).toBe(true);

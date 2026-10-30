@@ -50,15 +50,15 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
     exit 1
 fi
 
-echo "ℹ️  Building ${IMAGE}"
-gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-docker build --build-arg "APP_BUILD_SHA=${GITHUB_SHA}" -t "$IMAGE" .
-docker push "$IMAGE"
-
 if ! gcloud secrets describe "${ENVIRONMENT}-env" --project="$PROJECT" >/dev/null 2>&1; then
     echo "❌ Secret '${ENVIRONMENT}-env' not found. Upload the settings with scripts/gcp/push-env.sh." >&2
     exit 1
 fi
+
+echo "ℹ️  Building ${IMAGE}"
+gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+docker build --build-arg "APP_BUILD_SHA=${GITHUB_SHA}" -t "$IMAGE" .
+docker push "$IMAGE"
 
 ENV_VARS="APP_ENV=${ENVIRONMENT}"
 ENV_VARS+="@@FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}"

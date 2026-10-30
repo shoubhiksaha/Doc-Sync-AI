@@ -110,20 +110,30 @@ bash scripts/gcp/push-env.sh production .env.production.local
 ```
 
 Include `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, the Google OAuth client, the service account, the AI
-keys and `PROXY_SECRET`; leave out `APP_ENV`, `NEXTAUTH_URL` and `FIRESTORE_DATABASE_ID` (the
+keys and `PROXY_SECRET` (a different value per environment; with it set, the app refuses requests
+that don't come through the Cloudflare Worker); leave out `APP_ENV`, `NEXTAUTH_URL` and `FIRESTORE_DATABASE_ID` (the
 deploy sets those). New values apply on the next deploy. Only that environment's runtime service
 account can read its secret.
 
-**Running cost:** at DocSync's current traffic this setup stays inside Google Cloud's free tier.
-- Cloud Run: 2 million requests a month free.
-- Secret Manager: 2 secrets, each with at most 2 versions kept.
-- Artifact Registry: the 4 newest images, about 430 MB.
+**Running cost** at DocSync's current traffic is a few rupees a month at most. Google Cloud's free
+allowances are per billing account, so they're shared with any other project billed to it.
+- **Cloud Run:** Mumbai is a Tier 1 region. 2 million requests, 180,000 vCPU-seconds and 360,000
+  GiB-seconds a month are free.
+- **Secret Manager:** 2 secrets with one version each. 6 active versions a month are free.
+- **Artifact Registry:** the 4 newest images. Each is about 108 MB compressed, and they share
+  layers. 0.5 GB is free, then $0.10 per GB a month.
+- **Data sent to users:** billed from Mumbai at Google's internet rates. Cloudflare caches
+  `/_next/static` files, which are most of the bytes.
+- **Firestore:** only the `(default)` database gets the free quota. The `staging` database is
+  billed for every read and write, which is a few paise at staging's volume.
 
 Don't add a secret per setting, raise the image count, or set minimum instances above 0
 without checking the bill.
 
 Staging domain: `gh variable set STAGING_DOMAIN --env staging --body docsync-staging.analogdigital.tech`,
-then publish the Cloudflare Worker ([deploy/cloudflare-proxy](../deploy/cloudflare-proxy/README.md)).
+then publish the staging Worker ([deploy/cloudflare-proxy](../deploy/cloudflare-proxy/README.md)).
+Publish the production Worker only after the first production deploy, because it takes over the
+domain from Vercel at that moment.
 
 Create the `staging` Firestore database once in the Firebase console (Firestore → Create
 database → ID `staging`). Add each domain to the Google OAuth client's authorized origins and
