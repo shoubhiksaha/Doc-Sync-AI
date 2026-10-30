@@ -1,7 +1,7 @@
 # DocSync AI
 
-[![Production](https://github.com/shoubhiksaha/Doc-Sync-AI/actions/workflows/production.yml/badge.svg?branch=main)](https://github.com/shoubhiksaha/Doc-Sync-AI/actions/workflows/production.yml)
-[![Staging](https://github.com/shoubhiksaha/Doc-Sync-AI/actions/workflows/staging.yml/badge.svg?branch=staging)](https://github.com/shoubhiksaha/Doc-Sync-AI/actions/workflows/staging.yml)
+[![Production](https://github.com/shoubhiksaha/docsync-ai/actions/workflows/production.yml/badge.svg?branch=main)](https://github.com/shoubhiksaha/docsync-ai/actions/workflows/production.yml)
+[![Staging](https://github.com/shoubhiksaha/docsync-ai/actions/workflows/staging.yml/badge.svg?branch=staging)](https://github.com/shoubhiksaha/docsync-ai/actions/workflows/staging.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 **Photograph a paper business document and get it as a row in your Google Sheet.** DocSync AI reads

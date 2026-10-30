@@ -43,5 +43,5 @@ First public version.
 - **Bring your own key:** user keys encrypted with AES-256-GCM.
 - **Installable mobile web app** (PWA).
 
-[Unreleased]: https://github.com/shoubhiksaha/Doc-Sync-AI/compare/v0.1.0...staging
-[0.1.0]: https://github.com/shoubhiksaha/Doc-Sync-AI/releases/tag/v0.1.0
+[Unreleased]: https://github.com/shoubhiksaha/docsync-ai/compare/v0.1.0...staging
+[0.1.0]: https://github.com/shoubhiksaha/docsync-ai/releases/tag/v0.1.0

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please **don't open a public issue**. Report it privately through
-[GitHub's private vulnerability reporting](https://github.com/shoubhiksaha/Doc-Sync-AI/security/advisories/new).
+[GitHub's private vulnerability reporting](https://github.com/shoubhiksaha/docsync-ai/security/advisories/new).
 
 Include what you found, how to reproduce it, and what an attacker could do with it. We aim to
 acknowledge a report within 3 working days and will keep you updated until it's fixed.
