@@ -11,9 +11,9 @@
 #                (Firestore database "staging")
 # The public domains reach Cloud Run through the Cloudflare Worker in deploy/cloudflare-proxy.
 #
-# Runtime settings come from Secret Manager: every secret named "<environment>-<VARIABLE>"
-# becomes the environment variable VARIABLE (upload them with scripts/gcp/push-env.sh).
-# APP_ENV, NEXTAUTH_URL and FIRESTORE_DATABASE_ID are set here.
+# Runtime settings are one Secret Manager secret per environment, "<environment>-env" (uploaded
+# with scripts/gcp/push-env.sh), mounted at /secrets/app.env and loaded by Node at start.
+# APP_ENV, NEXTAUTH_URL and FIRESTORE_DATABASE_ID are set here and take precedence.
 #
 # Required: gcloud signed in as the deployer (google-github-actions/auth), GITHUB_SHA
 # Optional: GCP_PROJECT_ID (default docsyncai1), STAGING_DOMAIN
@@ -55,15 +55,8 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 docker build --build-arg "APP_BUILD_SHA=${GITHUB_SHA}" -t "$IMAGE" .
 docker push "$IMAGE"
 
-# "staging-NEXTAUTH_SECRET" → NEXTAUTH_SECRET=staging-NEXTAUTH_SECRET:latest
-SECRETS=""
-while read -r name; do
-    case "$name" in
-        "${ENVIRONMENT}-"*) SECRETS="${SECRETS:+$SECRETS,}${name#"${ENVIRONMENT}-"}=${name}:latest" ;;
-    esac
-done < <(gcloud secrets list --project="$PROJECT" --format='value(name.basename())')
-if [ -z "$SECRETS" ]; then
-    echo "❌ No '${ENVIRONMENT}-*' secrets in Secret Manager. Upload them with scripts/gcp/push-env.sh." >&2
+if ! gcloud secrets describe "${ENVIRONMENT}-env" --project="$PROJECT" >/dev/null 2>&1; then
+    echo "❌ Secret '${ENVIRONMENT}-env' not found. Upload the settings with scripts/gcp/push-env.sh." >&2
     exit 1
 fi
 
@@ -77,7 +70,7 @@ gcloud run deploy "$SERVICE" \
     --service-account="$RUNTIME_SA" --allow-unauthenticated \
     --port=8080 --cpu=1 --memory=1Gi --cpu-boost --concurrency=40 --timeout=120 \
     --min-instances=0 --max-instances="$MAX_INSTANCES" \
-    --set-env-vars="^@@^${ENV_VARS}" --set-secrets="$SECRETS" \
+    --set-env-vars="^@@^${ENV_VARS}" --set-secrets="/secrets/app.env=${ENVIRONMENT}-env:latest" \
     --labels="app=docsync,environment=${ENVIRONMENT}" \
     --quiet
 

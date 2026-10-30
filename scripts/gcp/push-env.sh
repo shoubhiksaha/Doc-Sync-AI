@@ -4,56 +4,45 @@
 #
 # Usage: bash scripts/gcp/push-env.sh <staging|production> <env-file>
 #
-# Every KEY=value line in the file (same format as .env.example) becomes the secret
-# "<environment>-KEY", which the next deploy exposes to the app as KEY. Values are piped to
-# gcloud on stdin and never printed. Only the environment's runtime service account can read them.
-# A new value takes effect on the next deploy. To remove a setting, delete its secret:
-#   gcloud secrets delete <environment>-KEY --project docsyncai1
+# The whole file (same format as .env.example) becomes ONE secret, "<environment>-env", which
+# Cloud Run mounts at /secrets/app.env and Node loads at start (see Dockerfile). One secret per
+# environment keeps Secret Manager inside its free tier (6 stored versions, 10,000 reads a
+# month); a secret per setting would be billed. Only the previous version is kept.
+#
+# The file is uploaded via stdin and never printed. Only the environment's runtime service
+# account can read the secret. New settings apply on the next deploy.
 # ==============================================================================
 set -euo pipefail
 
 ENVIRONMENT="${1:?usage: push-env.sh <staging|production> <env-file>}"
 FILE="${2:?usage: push-env.sh <staging|production> <env-file>}"
 PROJECT="${GCP_PROJECT_ID:-docsyncai1}"
+SECRET="${ENVIRONMENT}-env"
 RUNTIME_SA="docsync-${ENVIRONMENT}@${PROJECT}.iam.gserviceaccount.com"
 
 case "$ENVIRONMENT" in staging|production) ;; *) echo "Unknown environment: $ENVIRONMENT" >&2; exit 2 ;; esac
 [ -f "$FILE" ] || { echo "❌ $FILE not found" >&2; exit 1; }
 
-# Set by scripts/ci/deploy.sh for each environment, so they never come from a file.
-RESERVED=" APP_ENV NEXTAUTH_URL FIRESTORE_DATABASE_ID PORT HOSTNAME NODE_ENV "
+# Set by scripts/ci/deploy.sh for each environment; the deploy's values would win anyway.
+RESERVED='^(export[[:space:]]+)?(APP_ENV|NEXTAUTH_URL|FIRESTORE_DATABASE_ID|PORT|HOSTNAME|NODE_ENV)='
+grep -Eq "$RESERVED" "$FILE" && echo "ℹ️  Ignoring APP_ENV / NEXTAUTH_URL / FIRESTORE_DATABASE_ID: the deploy sets them"
 
-count=0
-while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in ''|'#'*) continue ;; esac
-    key="${line%%=*}"
-    key="${key#export }"
-    key="$(echo "$key" | tr -d '[:space:]')"
-    value="${line#*=}"
-    [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || { echo "⚠️  Skipping a line that isn't KEY=value"; continue; }
-    [ -n "$value" ] || continue
-    if [[ "$RESERVED" == *" $key "* ]]; then
-        echo "ℹ️  Skipping $key (set by the deploy)"
-        continue
-    fi
-    # Strip one pair of matching surrounding quotes, as dotenv does.
-    if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
+# Settings only: drop comments, blank lines, empty values and the reserved names.
+if ! gcloud secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1; then
+    gcloud secrets create "$SECRET" --project="$PROJECT" --replication-policy=automatic \
+        --labels="app=docsync,environment=${ENVIRONMENT}" >/dev/null
+fi
+grep -Ev '^[[:space:]]*(#|$)' "$FILE" | grep -Ev '^[^=]+=[[:space:]]*$' | grep -Ev "$RESERVED" \
+    | gcloud secrets versions add "$SECRET" --project="$PROJECT" --data-file=- >/dev/null
+gcloud secrets add-iam-policy-binding "$SECRET" --project="$PROJECT" \
+    --member="serviceAccount:${RUNTIME_SA}" --role=roles/secretmanager.secretAccessor >/dev/null
 
-    secret="${ENVIRONMENT}-${key}"
-    if ! gcloud secrets describe "$secret" --project="$PROJECT" >/dev/null 2>&1; then
-        gcloud secrets create "$secret" --project="$PROJECT" --replication-policy=automatic \
-            --labels="app=docsync,environment=${ENVIRONMENT}" >/dev/null
-    fi
-    printf '%s' "$value" | gcloud secrets versions add "$secret" --project="$PROJECT" --data-file=- >/dev/null
-    # Secret Manager bills per stored version, so drop the ones the new value replaces.
-    gcloud secrets versions list "$secret" --project="$PROJECT" --filter='state=ENABLED' \
-        --sort-by='~createTime' --format='value(name.basename())' | tail -n +2 | while read -r old; do
-        gcloud secrets versions destroy "$old" --secret="$secret" --project="$PROJECT" --quiet >/dev/null
-    done
-    gcloud secrets add-iam-policy-binding "$secret" --project="$PROJECT" \
-        --member="serviceAccount:${RUNTIME_SA}" --role=roles/secretmanager.secretAccessor >/dev/null
-    echo "✅ $key"
-    count=$((count + 1))
-done <"$FILE"
+# Keep the new version and the one before it (running instances may still be on it); destroy
+# the rest, since every stored version counts toward the free tier.
+gcloud secrets versions list "$SECRET" --project="$PROJECT" --filter='state!=DESTROYED' \
+    --sort-by='~createTime' --format='value(name.basename())' | tail -n +3 | while read -r old; do
+    gcloud secrets versions destroy "$old" --secret="$SECRET" --project="$PROJECT" --quiet >/dev/null
+done
 
-echo "Uploaded $count settings for ${ENVIRONMENT}. They apply on the next deploy."
+count="$(grep -Ev '^[[:space:]]*(#|$)' "$FILE" | grep -Ev '^[^=]+=[[:space:]]*$' | grep -Evc "$RESERVED" || true)"
+echo "✅ Uploaded $count settings to ${SECRET}. They apply on the next ${ENVIRONMENT} deploy."

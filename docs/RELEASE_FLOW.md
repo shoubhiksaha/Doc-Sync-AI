@@ -20,10 +20,10 @@ How the split is wired:
   and deploys it to that environment's service. It signs in to Google with Workload Identity
   Federation, so no Google key is stored in GitHub, and only this repository's `staging` and
   `production` environments can use it.
-- Each environment's settings are Secret Manager secrets named `<environment>-<VARIABLE>`
-  (for example `staging-NEXTAUTH_SECRET`), uploaded with `scripts/gcp/push-env.sh`. The deploy
-  passes every one of them to the service, and sets `APP_ENV`, `NEXTAUTH_URL` and
-  `FIRESTORE_DATABASE_ID` itself.
+- Each environment's settings are one Secret Manager secret, `<environment>-env` (a whole
+  `.env` file), uploaded with `scripts/gcp/push-env.sh`. Cloud Run mounts it at
+  `/secrets/app.env` and Node loads it at start. The deploy sets `APP_ENV`, `NEXTAUTH_URL` and
+  `FIRESTORE_DATABASE_ID` itself, and those take precedence.
 - The public domains reach Cloud Run through a Cloudflare Worker on ADT's Cloudflare account
   ([deploy/cloudflare-proxy](../deploy/cloudflare-proxy/README.md)), because Cloud Run can't map
   custom domains in Mumbai.
@@ -97,7 +97,7 @@ bash scripts/gcp/setup.sh
 ```
 
 It turns on Cloud Run, Artifact Registry, Secret Manager and the three IAM APIs that keyless
-sign-in needs; creates the image repository (keeps the 10 newest images), a runtime service
+sign-in needs; creates the image repository (keeps the 4 newest images), a runtime service
 account per environment and the deployer account; and sets the GitHub repository variables
 `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT`. It is safe to re-run.
 
@@ -112,7 +112,15 @@ bash scripts/gcp/push-env.sh production .env.production.local
 Include `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, the Google OAuth client, the service account, the AI
 keys and `PROXY_SECRET`; leave out `APP_ENV`, `NEXTAUTH_URL` and `FIRESTORE_DATABASE_ID` (the
 deploy sets those). New values apply on the next deploy. Only that environment's runtime service
-account can read its secrets.
+account can read its secret.
+
+**Running cost:** at DocSync's current traffic this setup stays inside Google Cloud's free tier.
+- Cloud Run: 2 million requests a month free.
+- Secret Manager: 2 secrets, each with at most 2 versions kept.
+- Artifact Registry: the 4 newest images, about 430 MB.
+
+Don't add a secret per setting, raise the image count, or set minimum instances above 0
+without checking the bill.
 
 Staging domain: `gh variable set STAGING_DOMAIN --env staging --body docsync-staging.analogdigital.tech`,
 then publish the Cloudflare Worker ([deploy/cloudflare-proxy](../deploy/cloudflare-proxy/README.md)).

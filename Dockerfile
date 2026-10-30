@@ -22,4 +22,5 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 USER node
 EXPOSE 8080
-CMD ["node", "server.js"]
+# Settings: the "<environment>-env" secret, mounted here by Cloud Run (scripts/ci/deploy.sh).
+CMD ["node", "--env-file-if-exists=/secrets/app.env", "server.js"]

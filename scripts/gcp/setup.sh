@@ -7,7 +7,8 @@
 # Creates, in project docsyncai1 (Mumbai, asia-south1):
 #   • APIs: Cloud Run, Artifact Registry, Secret Manager, and IAM / IAM Credentials / STS
 #     (the last three let GitHub Actions sign in without a stored key)
-#   • Artifact Registry repository "docsync" that keeps the 10 newest images
+#   • Artifact Registry repository "docsync" that keeps the 4 newest images (~430 MB, inside the
+#     0.5 GB free tier)
 #   • Runtime service accounts docsync-staging and docsync-production (no project roles)
 #   • Deployer service account docsync-deployer, usable only by this repository's
 #     staging and production GitHub environments (Workload Identity Federation)
@@ -39,7 +40,7 @@ POLICY="$(mktemp)"
 trap 'rm -f "$POLICY"' EXIT
 cat >"$POLICY" <<'JSON'
 [
-  {"name": "keep-newest-10", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 10}},
+  {"name": "keep-newest-4", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 4}},
   {"name": "delete-older", "action": {"type": "Delete"}, "condition": {"tagState": "any"}}
 ]
 JSON
