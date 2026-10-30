@@ -90,14 +90,16 @@ works.
 
 ## Deployment
 
-Deploys run only from GitHub Actions, to Vercel:
+DocSync AI runs on Google Cloud Run in Mumbai, one service per environment, with the domains on
+Cloudflare. Deploys run only from GitHub Actions:
 
 1. A feature branch opens a PR into `staging`. Tests run, the deploy waits for the owner's
    approval, then contract tests run.
 2. The same branch then opens a PR into `main`. The PR check confirms every commit was already
    verified on staging, tests run, the owner approves, and production deploys.
 
-See [docs/RELEASE_FLOW.md](./docs/RELEASE_FLOW.md) and
+The container is defined in the [Dockerfile](./Dockerfile). See
+[docs/RELEASE_FLOW.md](./docs/RELEASE_FLOW.md) for the one-time Google Cloud setup and
 [docs/release_checklist.md](./docs/release_checklist.md).
 
 ## Contributing and security

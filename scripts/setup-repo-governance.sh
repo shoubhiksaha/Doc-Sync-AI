@@ -139,19 +139,12 @@ gh secret list --repo "$REPO" || true
 cat <<'EOF'
 
 Next steps (manual):
-  • Create a Vercel token (vercel.com/account/tokens) and store it on BOTH environments:
-        gh secret set VERCEL_TOKEN --env staging    --repo shoubhiksaha/docsync-ai
-        gh secret set VERCEL_TOKEN --env production --repo shoubhiksaha/docsync-ai
-  • Set the Vercel project ids as variables on both environments (values are in
-    .vercel/project.json after `vercel link`, or Vercel → Project → Settings):
-        gh variable set VERCEL_ORG_ID     --env staging --body <team_or_user_id>
-        gh variable set VERCEL_PROJECT_ID --env staging --body <project_id>
-        (repeat both with --env production)
-  • Optional: gh variable set STAGING_DOMAIN --env staging --body staging.docsync.analogdigital.tech
-    (add the domain to the Vercel project first).
-  • Optional: if Vercel Deployment Protection is on for previews, create a
-    "Protection Bypass for Automation" secret in Vercel and store it:
-        gh secret set VERCEL_AUTOMATION_BYPASS_SECRET --env staging
+  • Google Cloud hosting (Cloud Run, keyless sign-in from GitHub Actions):
+        bash scripts/gcp/setup.sh
+        bash scripts/gcp/push-env.sh staging    .env.staging.local
+        bash scripts/gcp/push-env.sh production .env.production.local
+  • Optional: gh variable set STAGING_DOMAIN --env staging --body docsync-staging.analogdigital.tech
+    and publish the Cloudflare Worker in deploy/cloudflare-proxy.
   • Solo-owner note: GitHub never lets you approve your own PR, so PRs need no approving
     review. Every PR must still pass the required checks, and every deploy waits for your
     approval on its environment.

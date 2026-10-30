@@ -1,8 +1,8 @@
 name: Production Deploy
 
 # A feature branch merged into `main` (via its own PR — never from `staging`) is checked for
-# staging provenance, tested again, and deployed to the production environment (Vercel
-# "Production", Firestore database "(default)", https://docsync.analogdigital.tech) after the
+# staging provenance, tested again, and deployed to the production environment (Cloud Run
+# service docsync-production, Firestore database "(default)", https://docsync.analogdigital.tech) after the
 # owner approves the run on the `production` GitHub environment.
 on:
   push:
@@ -38,19 +38,20 @@ jobs:
     name: Deploy to Production
     needs: [quality]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # keyless sign-in to Google Cloud
     environment:
       name: production
       url: https://docsync.analogdigital.tech
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          node-version: 22
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: bash scripts/ci/deploy.sh production
 
   verify:
@@ -84,4 +85,4 @@ jobs:
       - name: How to roll back
         if: failure()
         run: |
-          echo "::error title=Production verification failed::Roll back now: Vercel dashboard → Project → Deployments → previous production deployment → Instant Rollback (or 'vercel rollback' with a token). Then 'git revert -m 1 <merge-sha>' on a new branch and ship the revert through staging → main."
+          echo "::error title=Production verification failed::Roll back now: Cloud Run console → docsync-production → Revisions → previous revision → Manage traffic → 100% (or 'gcloud run services update-traffic docsync-production --region asia-south1 --to-revisions <previous>=100'). Then 'git revert -m 1 <merge-sha>' on a new branch and ship the revert through staging → main."

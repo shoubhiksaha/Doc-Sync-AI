@@ -25,7 +25,28 @@ export function limitFor(group: RateGroup): number {
   return LIMITS[group];
 }
 
+/** Constant-time string comparison (Edge middleware has no crypto.timingSafeEqual). */
+function sameSecret(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * The caller's IP. On Cloud Run (PROXY_SECRET set), x-real-ip is trusted only from the Cloudflare
+ * proxy in deploy/cloudflare-proxy, which proves itself with the shared secret; anyone else could
+ * pick their own x-real-ip and dodge the limits. A request that reaches Cloud Run directly is keyed
+ * on the last x-forwarded-for entry, which Google's front end appends and the caller can't forge.
+ */
 export function clientIp(headers: Headers): string {
+  const proxySecret = process.env.PROXY_SECRET;
+  if (proxySecret) {
+    if (sameSecret(headers.get('x-proxy-secret') ?? '', proxySecret)) {
+      return headers.get('x-real-ip')?.trim() || 'unknown';
+    }
+    return headers.get('x-forwarded-for')?.split(',').pop()?.trim() || 'unknown';
+  }
   return headers.get('x-real-ip')?.trim()
     || headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || 'unknown';

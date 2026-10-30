@@ -1,0 +1,20 @@
+// The Cloudflare Worker in front of DocSync AI's Cloud Run services. Publish from this folder with
+// `npx wrangler deploy`, signed in to ADT's Cloudflare account (see README.md).
+{
+  "name": "docsync-proxy",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-19",
+  "routes": [
+    // Production keeps its existing DNS record; the route takes over its traffic.
+    { "pattern": "docsync.analogdigital.tech/*", "zone_name": "analogdigital.tech" },
+    // Staging: Cloudflare creates the DNS record and certificate. One level below the zone, so
+    // the free certificate covers it (staging.docsync.analogdigital.tech would not be).
+    { "pattern": "docsync-staging.analogdigital.tech", "custom_domain": true }
+  ],
+  "vars": {
+    // Public hostname → Cloud Run address (https://<service>-<project number>.<region>.run.app).
+    "ORIGINS": "{\"docsync.analogdigital.tech\":\"https://docsync-production-874251779348.asia-south1.run.app\",\"docsync-staging.analogdigital.tech\":\"https://docsync-staging-874251779348.asia-south1.run.app\"}"
+  },
+  // PROXY_SECRET is a Worker secret (npx wrangler secret put PROXY_SECRET), never in this file.
+  "workers_dev": false
+}

@@ -1,7 +1,7 @@
 name: Staging Deploy
 
 # A feature branch merged into `staging` (via PR, merge commit) is tested again and then
-# deployed to the staging environment: the Vercel "Preview" environment (aliased to
+# deployed to the staging environment: Cloud Run service docsync-staging (served at
 # vars.STAGING_DOMAIN when set) and Firestore database "staging".
 # The deploy job waits for the owner's approval on the `staging` GitHub environment.
 on:
@@ -25,6 +25,9 @@ jobs:
     name: Deploy to Staging
     needs: [quality]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # keyless sign-in to Google Cloud
     environment:
       name: staging
       url: ${{ steps.deploy.outputs.deployment_url || vars.STAGING_URL }}
@@ -32,15 +35,14 @@ jobs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          node-version: 22
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Deploy
         id: deploy
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           STAGING_DOMAIN: ${{ vars.STAGING_DOMAIN }}
         run: bash scripts/ci/deploy.sh staging
 
@@ -63,8 +65,6 @@ jobs:
           TARGET_URL: ${{ needs.deploy.outputs.deployment_url || vars.STAGING_URL }}
           EXPECTED_ENVIRONMENT: staging
           EXPECTED_VERSION: ${{ github.sha }}
-          # Repository-level secret (this job has no environment, so it can't read environment secrets).
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           CI: true
         run: npm run test:contract
       - name: Upload Playwright report

@@ -20,6 +20,8 @@ Verified on staging, not yet in production.
   gates and contract tests.
 
 ### Changed
+- **Hosting moved to Google Cloud Run in Mumbai**, one service per environment, deployed from
+  GitHub Actions without stored Google keys. The domains stay on Cloudflare.
 - **Redesigned scan flow:** photo → reading → check → saved, with remembered fields, auto-save, and
   per-destination retry.
 - **Shared checks:** one rule each for vehicle numbers, phone numbers, GSTIN and money amounts,

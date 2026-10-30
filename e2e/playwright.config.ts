@@ -13,7 +13,6 @@ const remoteTarget = process.env.TARGET_URL || process.env.BASE_URL;
 // The signed-in specs sign their session cookie with the same NEXTAUTH_SECRET as the server, so
 // load the app's .env files the way `next start` does (CI sets the variables directly).
 loadEnvConfig(path.join(__dirname, '..'));
-const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 export default defineConfig({
   testDir: './tests',
@@ -28,10 +27,6 @@ export default defineConfig({
   use: {
     baseURL: remoteTarget || 'http://localhost:3000',
     trace: 'on-first-retry',
-    // Lets the contract suite reach Vercel deployments that have Deployment Protection on.
-    extraHTTPHeaders: bypassSecret
-      ? { 'x-vercel-protection-bypass': bypassSecret, 'x-vercel-set-bypass-cookie': 'true' }
-      : undefined,
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
